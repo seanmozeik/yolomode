@@ -98,11 +98,11 @@ RUN printf '%s\n' \
 RUN mkdir -p /work /home/yolo/.claude /home/yolo/.codex /home/yolo/.cache \
     && chown -R yolo:yolo /work /home/yolo
 
-# Entrypoint (runs as root for setup, drops to yolo user)
-RUN apk add --no-cache su-exec
+# Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
+USER yolo
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["zsh"]
