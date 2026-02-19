@@ -7,24 +7,33 @@ Sessions run in parallel. Launch five at once, each working a different problem,
 ## Prerequisites
 
 - Docker or OrbStack
-- [just](https://github.com/casey/just)
+- [Bun](https://bun.sh) (for building from source)
 - Claude Code authenticated on your Mac (`claude login`)
 - Codex authenticated on your Mac (`codex login`), if using Codex
 
-## Build
+## Install
 
 ```
-just build
+git clone <repo-url> && cd yolomode
+just build && just install
+```
+
+This compiles the CLI to a single binary and copies it to `/usr/local/bin/yolomode`.
+
+## Usage
+
+### Build the Docker image
+
+```
+yolomode build
 ```
 
 First build pulls Alpine, installs mise (python, go, zig, rust), Bun, Claude Code, Codex, ripgrep, fd, sd, starship, and the usual build tools. Takes a few minutes. Subsequent builds hit cache.
 
-## Usage
-
 ### Start a session
 
 ```
-just run
+yolomode run
 ```
 
 This creates a named container (e.g., `yolomode-swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell.
@@ -39,7 +48,7 @@ codex --full-auto
 ### Reattach to a session
 
 ```
-just attach yolomode-swift-fox
+yolomode attach yolomode-swift-fox
 ```
 
 The container keeps its state after exit. Pick up where you left off.
@@ -47,31 +56,31 @@ The container keeps its state after exit. Pick up where you left off.
 ### List sessions
 
 ```
-just list
+yolomode ls
 ```
 
 ### Extract changes
 
 ```
-just sync yolomode-swift-fox
+yolomode sync yolomode-swift-fox
 ```
 
 Copies the container's working tree to `.yolomode/yolomode-swift-fox/` on the host. Review with `git diff`, apply with `git format-patch` and `git am`, or just copy files over.
 
-### Shell access
-
-```
-just shell yolomode-swift-fox
-```
-
-Opens a zsh shell inside a running session.
-
 ### Cleanup
 
 ```
-just clean yolomode-swift-fox    # remove one session
-just clean-all                    # remove all stopped sessions
+yolomode rm yolomode-swift-fox    # remove one session
+yolomode rm --all                  # remove all stopped sessions
 ```
+
+### Force rebuild
+
+```
+yolomode build --no-cache
+```
+
+Builds from scratch, no cache. Use after bumping tool versions or modifying the Dockerfile.
 
 ## How isolation works
 
@@ -91,10 +100,11 @@ Installed via Bun: Claude Code, Codex.
 Installed via cargo-binstall: ripgrep, fd, sd, starship.
 Your starship.toml is mounted into the container if it exists.
 
-## Force rebuild
+## Development
 
 ```
-just rebuild
+just dev run          # run CLI without compiling
+just dev ls           # any command works
+just build            # compile binary
+just install          # compile + copy to /usr/local/bin
 ```
-
-Builds from scratch, no cache. Use after bumping tool versions or modifying the Dockerfile.

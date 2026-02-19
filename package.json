@@ -1,0 +1,11 @@
+{
+	"name": "yolomode",
+	"version": "0.1.0",
+	"scripts": {
+		"build": "bun build --compile src/cli.ts --outfile yolomode",
+		"dev": "bun run src/cli.ts"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.3.9"
+	}
+}

@@ -1,1 +1,4 @@
 .yolomode/
+yolomode
+node_modules/
+bun.lock
