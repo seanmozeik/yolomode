@@ -311,7 +311,7 @@ try {
 				}
 			}
 
-			// --- Claude config: skills, plugins (direct mount) ---
+			// --- Claude config: skills, plugins, root CLAUDE.md (direct mount) ---
 			const claudeSkills = join(HOME, ".claude", "skills");
 			if (await dirExists(claudeSkills)) {
 				mounts.push("-v", `${claudeSkills}:/home/yolo/.claude/skills:ro`);
@@ -320,6 +320,11 @@ try {
 			const claudePlugins = join(HOME, ".claude", "plugins");
 			if (await dirExists(claudePlugins)) {
 				mounts.push("-v", `${claudePlugins}:/home/yolo/.claude/plugins:ro`);
+			}
+
+			const claudeRootMd = join(HOME, ".claude", "CLAUDE.md");
+			if (await Bun.file(claudeRootMd).exists()) {
+				mounts.push("-v", `${claudeRootMd}:/home/yolo/.claude/CLAUDE.md:ro`);
 			}
 
 			// --- Codex auth ---
@@ -674,7 +679,10 @@ try {
 			} else {
 				const id = args[1];
 				if (!id) die("usage: yolomode rm <name> [-a | --all]");
-				await run($`docker rm -f ${id}`);
+				const inspectResult = await $`docker inspect ${id}`.quiet().nothrow();
+				if (inspectResult.exitCode !== 0) die(`no such container: ${id}`);
+				await $`docker stop ${id}`.quiet().nothrow();
+				await run($`docker rm ${id}`);
 				await $`docker volume rm ${id}`.nothrow().quiet();
 				console.log(`${pc.green("✔")} Removed ${pc.cyan(id)}`);
 			}
