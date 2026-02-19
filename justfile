@@ -4,21 +4,47 @@ image := "yolomode"
 build:
   docker build -t {{image}} .
 
-# Start a new isolated session
-run *args:
+# Start a new isolated session (drops into zsh)
+run:
   #!/usr/bin/env bash
   set -euo pipefail
-  id=$(head -c 4 /dev/urandom | xxd -p | head -c 4)
-  name="yolomode-${id}"
-  # Extract OAuth credentials from macOS keychain
-  creds=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true)
+  adjectives=(bold brave calm cool deft fast keen fond mild sharp slim snug warm wild wise swift quiet grand stark vivid)
+  animals=(fox owl elk yak emu ape ram cod jay bee ant bat cat dog hen rat pig cow elk bug)
+  adj=${adjectives[$((RANDOM % ${#adjectives[@]}))]}
+  noun=${animals[$((RANDOM % ${#animals[@]}))]}
+  name="yolomode-${adj}-${noun}"
+  # Extract Claude Code OAuth credentials from macOS keychain
+  claude_creds=$(security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true)
+  # Extract Codex auth from ~/.codex/auth.json
+  codex_auth=""
+  if [ -f "$HOME/.codex/auth.json" ]; then
+    codex_auth=$(cat "$HOME/.codex/auth.json")
+  fi
+  # Optional host mounts (read-only)
+  optional_mounts=()
+  starship_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml"
+  if [ -f "$starship_cfg" ]; then
+    optional_mounts+=(-v "$starship_cfg":/home/yolo/.config/starship.toml:ro)
+  fi
+  if [ -d "$HOME/.claude/skills" ]; then
+    optional_mounts+=(-v "$HOME/.claude/skills":/home/yolo/.claude/skills:ro)
+  fi
+  if [ -d "$HOME/.claude/plugins" ]; then
+    optional_mounts+=(-v "$HOME/.claude/plugins":/home/yolo/.claude/plugins:ro)
+  fi
   echo "Starting session: $name"
   docker run -it \
     --name "$name" \
     -v "$PWD":/src:ro \
+    "${optional_mounts[@]}" \
+    --cap-drop ALL \
+    --security-opt no-new-privileges:true \
+    --tmpfs /tmp:nosuid,size=500m \
     -e ANTHROPIC_API_KEY \
-    -e CLAUDE_CREDENTIALS="$creds" \
-    {{image}} {{args}}
+    -e OPENAI_API_KEY \
+    -e CLAUDE_CREDENTIALS="$claude_creds" \
+    -e CODEX_AUTH="$codex_auth" \
+    {{image}} zsh
   echo ""
   echo "Session exited: $name"
   echo "  Reattach:  just attach $name"

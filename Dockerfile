@@ -1,5 +1,5 @@
 # ==================================================
-# yolomode: Alpine + kitchen-sink dev tools + Claude Code
+# yolomode: Alpine + kitchen-sink dev tools + Claude Code + Codex
 # ==================================================
 
 # ---- Cargo base (shared by Rust tool stages) ----
@@ -23,28 +23,38 @@ RUN cargo-binstall --no-confirm sd
 FROM cargo-base AS tool-starship
 RUN cargo-binstall --no-confirm starship
 
-# ---- Language runtimes via mise (node, bun, python, go, zig, rust) ----
-FROM docker.io/jdxcode/mise:latest AS mise-tools
+# ---- Language runtimes via mise (python, go, zig, rust) ----
+FROM alpine:3.23 AS mise-tools
+RUN apk add --no-cache mise bash curl xz build-base linux-headers zlib-dev \
+    libffi-dev openssl-dev readline-dev bzip2-dev sqlite-dev xz-dev
 RUN mkdir -p /opt/mise /opt/rustup /opt/cargo \
     && MISE_DATA_DIR=/opt/mise RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo XDG_DATA_HOME=/opt/mise \
-       mise use -g node bun go zig rust uv@latest python@3.13 && mise install
+       mise use -g go zig rust uv@latest python@3.13 && mise install
 
-# ---- Claude Code (installed via mise's bun) ----
-FROM mise-tools AS bun-tools
-ENV MISE_DATA_DIR=/opt/mise
-ENV PATH="/opt/mise/shims:${PATH}"
+# ---- Bun + Claude Code + Codex (independent install, known path) ----
+FROM alpine:3.23 AS bun-tools
+RUN apk add --no-cache curl bash ca-certificates unzip libstdc++
+ENV BUN_INSTALL=/usr/local/bun
+ENV PATH="$BUN_INSTALL/bin:$PATH"
+RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
 RUN bun install -g @anthropic-ai/claude-code
+RUN bun install -g @openai/codex
 
 # ---- Final runtime ----
 FROM alpine:3.23 AS runtime
 
-# System packages (runtimes come from mise, not apk)
+# System packages (node via apk, other runtimes from mise)
 RUN apk add --no-cache \
     git curl wget jq zsh bash \
     build-base openssh-client \
+    nodejs npm \
     github-cli \
     libstdc++ \
     coreutils findutils grep
+
+# Bun paths
+ENV BUN_INSTALL=/usr/local/bun
+ENV PATH="$BUN_INSTALL/bin:$PATH"
 
 # Mise/Rust paths
 ENV MISE_DATA_DIR=/opt/mise \
@@ -57,18 +67,28 @@ COPY --from=tool-ripgrep /root/.cargo/bin/rg /usr/local/bin/
 COPY --from=tool-fd /root/.cargo/bin/fd /usr/local/bin/
 COPY --from=tool-sd /root/.cargo/bin/sd /usr/local/bin/
 COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
-COPY --from=bun-tools /opt/mise /opt/mise
-COPY --from=bun-tools /opt/rustup /opt/rustup
-COPY --from=bun-tools /opt/cargo /opt/cargo
+COPY --from=bun-tools /usr/local/bun /usr/local/bun
+COPY --from=mise-tools /usr/bin/mise /usr/local/bin/mise
+COPY --from=mise-tools /opt/mise /opt/mise
+COPY --from=mise-tools /opt/rustup /opt/rustup
+COPY --from=mise-tools /opt/cargo /opt/cargo
+
+# Create non-root user
+RUN addgroup -g 1000 yolo && adduser -u 1000 -G yolo -h /home/yolo -s /bin/zsh -D yolo
+ENV HOME=/home/yolo
 
 # Shell setup
-RUN echo 'eval "$(starship init zsh)"' >> /root/.zshrc \
-    && echo 'eval "$(starship init bash)"' >> /root/.bashrc
+RUN echo 'eval "$(starship init zsh)"' >> /home/yolo/.zshrc \
+    && echo 'eval "$(starship init bash)"' >> /home/yolo/.bashrc
 
-# Entrypoint
+# Prepare writable directories owned by yolo user
+RUN mkdir -p /work /home/yolo/.claude /home/yolo/.codex /home/yolo/.cache \
+    && chown -R yolo:yolo /work /home/yolo
+
+# Entrypoint (runs as root for setup, drops to yolo user)
+RUN apk add --no-cache su-exec
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["claude", "--dangerously-skip-permissions"]
