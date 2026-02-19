@@ -58,7 +58,7 @@ const ANIMALS = [
 function generateName(): string {
 	const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
 	const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-	return `yolomode-${adj}-${animal}`;
+	return `${adj}-${animal}`;
 }
 
 async function dirExists(path: string): Promise<boolean> {
@@ -90,12 +90,15 @@ async function run(cmd: ReturnType<typeof $>) {
 	return result;
 }
 
-// Extract GitHub CLI token from host
-async function getGhToken(): Promise<string> {
-	return $`gh auth token 2>/dev/null || true`
+async function ensureRunning(id: string) {
+	const status = await $`docker inspect -f ${"{{.State.Running}}"} ${id}`
 		.quiet()
+		.nothrow()
 		.text()
 		.then((s) => s.trim());
+	if (status !== "true") {
+		await run($`docker start ${id}`);
+	}
 }
 
 // Extract Claude Code OAuth credentials from macOS keychain
@@ -122,7 +125,7 @@ async function preprocessClaudeConfig(srcPath: string): Promise<string> {
 	}
 }
 
-// Warn if Docker has less than 4GB RAM
+// Warn if Docker VM has insufficient RAM for parallel agents
 async function checkDockerMemory() {
 	try {
 		const mem = await $`docker info --format ${"{{.MemTotal}}"}`
@@ -132,11 +135,11 @@ async function checkDockerMemory() {
 		const memBytes = parseInt(mem, 10);
 		if (!isNaN(memBytes)) {
 			const memGB = memBytes / (1024 * 1024 * 1024);
-			if (memGB < 3.5) {
+			if (memGB < 6) {
 				warn(
-					`Docker has only ${memGB.toFixed(1)}GB RAM. Claude Code may get OOM killed.`,
+					`Docker has only ${memGB.toFixed(1)}GB RAM. Parallel agents will likely OOM.`,
 				);
-				warn("Increase Docker/Colima memory to 4GB+ for best results.");
+				warn("Increase Docker/Colima memory to 8GB+ for best results.");
 			}
 		}
 	} catch {
@@ -208,9 +211,6 @@ try {
 				mounts.push("-v", `${codexAuth}:/host-codex/auth.json:ro`);
 			}
 
-			// --- GitHub CLI token ---
-			const ghToken = await getGhToken();
-
 			// --- Optional host config ---
 			const starshipCfg = join(
 				process.env.XDG_CONFIG_HOME || join(HOME, ".config"),
@@ -234,13 +234,16 @@ try {
 				"ANTHROPIC_API_KEY",
 				"-e",
 				"OPENAI_API_KEY",
-				...(ghToken ? ["-e", `GH_TOKEN=${ghToken}`] : []),
+				"-e",
+				"TERM",
 				"--cap-drop",
 				"ALL",
 				"--security-opt",
 				"no-new-privileges:true",
+				"--shm-size",
+				"1g",
 				"--tmpfs",
-				"/tmp:nosuid,size=500m",
+				"/tmp:nosuid,size=2g",
 				IMAGE,
 			];
 
@@ -249,7 +252,8 @@ try {
 			console.log("");
 			console.log(`Session exited: ${name}`);
 			console.log(`  Reattach:  yolomode attach ${name}`);
-			console.log(`  Extract:   yolomode sync ${name}`);
+			console.log(`  Review:    yolomode diff ${name}`);
+			console.log(`  Apply:     yolomode apply ${name}`);
 			console.log(`  Remove:    yolomode rm ${name}`);
 			break;
 		}
@@ -258,24 +262,69 @@ try {
 		case "attach": {
 			const id = args[1];
 			if (!id) die("usage: yolomode attach <name>");
-
-			// Check if container is running; if stopped, start it detached first
-			const status = await $`docker inspect -f ${"{{.State.Running}}"} ${id}`
-				.quiet()
-				.nothrow()
-				.text()
-				.then((s) => s.trim());
-			if (status !== "true") {
-				await run($`docker start ${id}`);
-			}
-
-			// Exec a new shell — each attach gets its own independent session
-			await $`docker exec -it -w /work ${id} zsh`.nothrow();
+			await ensureRunning(id);
+			await $`docker exec -it -e TERM -w /work ${id} zsh`.nothrow();
 			break;
 		}
 
 		case "ls": {
 			await $`docker ps -a --filter ancestor=${IMAGE} --format ${"table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}"}`;
+			break;
+		}
+
+		case "diff": {
+			const id = args[1];
+			if (!id) die("usage: yolomode diff <name>");
+			await ensureRunning(id);
+			await $`docker exec ${id} git -C /work add -A`.quiet();
+			const patch =
+				await $`docker exec ${id} git -C /work diff --cached yolomode-base`
+					.quiet()
+					.text();
+			if (!patch.trim()) {
+				console.error("No changes.");
+			} else {
+				process.stdout.write(patch);
+			}
+			break;
+		}
+
+		case "apply": {
+			const id = args[1];
+			if (!id) die("usage: yolomode apply <name>");
+
+			const dirty = await $`git status --porcelain`
+				.quiet()
+				.text()
+				.then((s) => s.trim());
+			if (dirty) die("working tree is dirty — commit or stash first");
+
+			await ensureRunning(id);
+			await $`docker exec ${id} git -C /work add -A`.quiet();
+			const patch =
+				await $`docker exec ${id} git -C /work diff --cached yolomode-base`
+					.quiet()
+					.text();
+			if (!patch.trim()) die("no changes to apply");
+
+			const branch = `yolomode/${id}`;
+			const base = await $`git rev-parse --abbrev-ref HEAD`
+				.quiet()
+				.text()
+				.then((s) => s.trim());
+			const patchFile = join(tmpdir(), `yolomode-${id}.patch`);
+			try {
+				await writeFile(patchFile, patch);
+				await $`git checkout -b ${branch}`;
+				await $`git apply --stat ${patchFile}`.nothrow();
+				await $`git apply ${patchFile}`;
+				await $`git add -A`;
+				await $`git commit -m ${"yolomode: " + id}`;
+				console.log(`Branch created: ${branch}`);
+				await $`git checkout ${base}`;
+			} finally {
+				await rm(patchFile, { force: true });
+			}
 			break;
 		}
 
@@ -321,7 +370,9 @@ try {
 			console.log("  run            Start a new isolated session");
 			console.log("  attach <name>  Open a new shell in a session (alias: a)");
 			console.log("  ls             List all sessions");
-			console.log("  sync <name>    Extract changes from a session");
+			console.log("  diff <name>    Show changes from a session as a patch");
+			console.log("  apply <name>   Apply session changes to a new branch");
+			console.log("  sync <name>    Extract full work dir from a session");
 			console.log(
 				"  rm <name>      Remove a session (-a/--all for all stopped)",
 			);

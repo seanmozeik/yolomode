@@ -54,19 +54,23 @@ RUN apk add --no-cache \
     build-base openssh-client \
     nodejs npm \
     github-cli mise \
-    libstdc++ \
+    libstdc++ ncurses \
     coreutils findutils grep
 
-# Bun paths
+# Pre-installed tool paths (read-only from build stages)
 ENV BUN_INSTALL=/usr/local/bun
-ENV PATH="$BUN_INSTALL/bin:$PATH"
-
-# Mise/Rust paths
 ENV MISE_DATA_DIR=/opt/mise \
-    MISE_CONFIG_DIR=/opt/mise/config \
-    RUSTUP_HOME=/opt/rustup \
-    CARGO_HOME=/opt/cargo \
-    PATH="/opt/mise/shims:/opt/cargo/bin:${PATH}"
+    MISE_CONFIG_DIR=/opt/mise/config
+
+# Writable package manager homes for runtime installs
+ENV CARGO_HOME=/home/yolo/.cargo \
+    GOPATH=/home/yolo/go \
+    UV_CACHE_DIR=/home/yolo/.cache/uv \
+    UV_TOOL_BIN_DIR=/home/yolo/.local/bin \
+    npm_config_prefix=/home/yolo/.local \
+    npm_config_cache=/home/yolo/.cache/npm \
+    PIP_CACHE_DIR=/home/yolo/.cache/pip \
+    PATH="/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:$BUN_INSTALL/bin:/opt/mise/shims:/opt/cargo/bin:${PATH}"
 
 # Copy tool binaries
 COPY --from=tool-ripgrep /root/.cargo/bin/rg /usr/local/bin/
@@ -82,20 +86,28 @@ COPY --from=mise-tools /opt/cargo /opt/cargo
 RUN addgroup -g 1000 yolo && adduser -u 1000 -G yolo -h /home/yolo -s /bin/zsh -D yolo
 ENV HOME=/home/yolo
 
-# Shell setup
+# Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
 RUN printf '%s\n' \
+    'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init zsh)"' \
     'alias cc="claude --dangerously-skip-permissions"' \
     'alias co="codex --full-auto"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
+    'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
     'alias cc="claude --dangerously-skip-permissions"' \
     'alias co="codex --yolo"' \
     >> /home/yolo/.bashrc
 
+# Make global bun dir writable for runtime package installs
+RUN chown -R yolo:yolo /usr/local/bun
+
 # Prepare writable directories owned by yolo user
-RUN mkdir -p /work /home/yolo/.claude /home/yolo/.codex /home/yolo/.cache \
+RUN mkdir -p /work /home/yolo/.claude /home/yolo/.codex \
+    /home/yolo/.cargo/bin /home/yolo/go/bin \
+    /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
+    /home/yolo/.local/bin \
     && chown -R yolo:yolo /work /home/yolo
 
 # Entrypoint
