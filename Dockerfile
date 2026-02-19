@@ -54,7 +54,16 @@ FROM alpine:3.23 AS runtime
 # System packages (node via apk, other runtimes from mise)
 RUN apk add --no-cache \
     git curl wget jq zsh bash \
-    build-base openssh-client \
+    build-base openssh-client openssl openssl-dev \
+    linux-headers pkgconf \
+    libffi-dev \
+    sqlite-dev \
+    libxml2-dev libxslt-dev \
+    libpng-dev libjpeg-turbo-dev \
+    postgresql-dev \
+    ca-certificates \
+    git-lfs \
+    patch rsync \
     nodejs npm \
     github-cli mise \
     libstdc++ ncurses gcompat \

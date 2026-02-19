@@ -3,6 +3,7 @@ import { $ } from "bun";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join, resolve, basename } from "path";
+import { createInterface } from "readline";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
 import pc from "picocolors";
@@ -73,6 +74,17 @@ function generateName(): string {
 	const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
 	const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
 	return `${adj}-${animal}`;
+}
+
+async function generateUniqueName(): Promise<string> {
+	while (true) {
+		const name = generateName();
+		const existing = await $`docker ps -a --filter name=^${name}$ -q`
+			.quiet()
+			.text()
+			.then((s) => s.trim());
+		if (!existing) return name;
+	}
 }
 
 async function dirExists(path: string): Promise<boolean> {
@@ -152,6 +164,20 @@ function die(msg: string): never {
 
 function warn(msg: string) {
 	console.error(`${pc.yellow(pc.bold("warning:"))} ${msg}`);
+}
+
+async function confirm(question: string): Promise<boolean> {
+	if (!process.stdin.isTTY) return false;
+	const rl = createInterface({ input: process.stdin, output: process.stdout });
+	return new Promise((resolve) => {
+		rl.question(
+			`${pc.yellow(pc.bold("confirm:"))} ${question} [y/N] `,
+			(answer) => {
+				rl.close();
+				resolve(answer.trim().toLowerCase() === "y");
+			},
+		);
+	});
 }
 
 async function run(cmd: ReturnType<typeof $>) {
@@ -251,11 +277,14 @@ try {
 		}
 
 		case "run": {
-			const name = generateName();
+			const name = await generateUniqueName();
 			const mounts: string[] = [];
 
 			const importPaths = getFlags("--import");
 			const imports = await resolveImports(importPaths);
+
+			const memoryFlags = getFlags("--memory");
+			const memLimit = memoryFlags[memoryFlags.length - 1] ?? "16g";
 
 			await checkDockerMemory();
 			const spinner = ora("Preparing session...").start();
@@ -344,6 +373,8 @@ try {
 				"1g",
 				"--tmpfs",
 				"/tmp:nosuid,size=2g",
+				"--memory",
+				memLimit,
 				IMAGE,
 			];
 
@@ -455,38 +486,104 @@ try {
 			const id = args[1];
 			if (!id) die("usage: yolomode apply <name>");
 
-			const dirty = await $`git status --porcelain`
+			// Warn if applying from a different directory than where the session was created
+			const srcLabel =
+				await $`docker inspect --format ${"{{index .Config.Labels \"yolomode.src\"}}"} ${id}`
+					.quiet()
+					.nothrow()
+					.text()
+					.then((s) => s.trim());
+			if (srcLabel && srcLabel !== process.cwd()) {
+				warn(`Session was started in: ${pc.cyan(srcLabel)}`);
+				warn(`You are currently in:   ${pc.cyan(process.cwd())}`);
+				const ok = await confirm("Apply anyway?");
+				if (!ok) process.exit(1);
+			}
+
+			// Only block on tracked changes; untracked files (?? lines) are fine
+			const statusOutput = await $`git status --porcelain`
 				.quiet()
 				.text()
 				.then((s) => s.trim());
-			if (dirty) die("working tree is dirty — commit or stash first");
+			const conflicting = statusOutput
+				.split("\n")
+				.filter((l) => l.length > 0 && !l.startsWith("??"));
+			if (conflicting.length > 0)
+				die("working tree has uncommitted tracked changes — commit or stash first");
 
 			await ensureRunning(id);
+
+			// Stage everything in the container
 			await $`docker exec ${id} git -C /work add -A`.quiet();
-			const patch =
-				await $`docker exec ${id} git -C /work diff --cached --full-index yolomode-base`
+
+			// Commits since yolomode-base (oldest first)
+			const commits =
+				await $`docker exec ${id} git -C /work log --reverse --format=%H yolomode-base..HEAD`
+					.quiet()
+					.text()
+					.then((s) => s.trim().split("\n").filter(Boolean));
+
+			// Uncommitted WIP above HEAD (staged by git add -A above)
+			const wipPatch =
+				await $`docker exec ${id} git -C /work diff --cached --full-index --binary HEAD`
 					.quiet()
 					.text();
-			if (!patch.trim()) die("no changes to apply");
+			const hasWip = wipPatch.trim().length > 0;
+
+			if (commits.length === 0 && !hasWip) die("no changes to apply");
 
 			const branch = `yolomode/${id}`;
 			const base = await $`git rev-parse --abbrev-ref HEAD`
 				.quiet()
 				.text()
 				.then((s) => s.trim());
-			const patchFile = join(tmpdir(), `yolomode-${id}.patch`);
 			const spinner = ora("Applying changes...").start();
+			const patchDir = join(tmpdir(), `yolomode-${id}-patches`);
+			const wipFile = join(tmpdir(), `yolomode-${id}-wip.patch`);
+			let branchCreated = false;
+			let committedCount = 0;
+
 			try {
-				await writeFile(patchFile, patch);
 				await $`git checkout -b ${branch}`;
-				await $`git apply --stat ${patchFile}`.nothrow();
-				await $`git apply ${patchFile}`;
-				await $`git add -A`;
-				await $`git commit -m ${"yolomode: " + id}`;
-				spinner.succeed(`Branch created: ${pc.cyan(pc.bold(branch))}`);
+				branchCreated = true;
+
+				if (commits.length > 0) {
+					// format-patch preserves individual commit messages and authorship
+					await $`docker exec ${id} sh -c ${"rm -rf /tmp/ym-patches && mkdir /tmp/ym-patches && git -C /work format-patch --binary yolomode-base..HEAD -o /tmp/ym-patches/"}`
+						.quiet();
+					await $`mkdir -p ${patchDir}`;
+					await $`docker cp ${id}:/tmp/ym-patches ${patchDir}`;
+					await $`git am --3way ${join(patchDir, "ym-patches")}`;
+					committedCount = commits.length;
+				}
+
+				// Apply any uncommitted WIP on top
+				if (hasWip) {
+					await writeFile(wipFile, wipPatch);
+					await $`git apply ${wipFile}`;
+					await $`git add -A`;
+					const wipMsg =
+						commits.length > 0 ? "yolomode: wip" : `yolomode: ${id}`;
+					await $`git commit -m ${wipMsg}`;
+					committedCount++;
+				}
+
+				const plural = committedCount !== 1 ? "s" : "";
+				spinner.succeed(
+					`Branch created: ${pc.cyan(pc.bold(branch))} (${committedCount} commit${plural})`,
+				);
 				await $`git checkout ${base}`;
+			} catch (e) {
+				await $`git am --abort`.nothrow().quiet();
+				spinner.fail("Failed to apply changes");
+				if (branchCreated) {
+					await $`git checkout ${base}`.nothrow().quiet();
+					await $`git branch -D ${branch}`.nothrow().quiet();
+				}
+				throw e;
 			} finally {
-				await rm(patchFile, { force: true });
+				await rm(patchDir, { recursive: true, force: true });
+				await rm(wipFile, { force: true });
 			}
 			break;
 		}
@@ -506,18 +603,18 @@ try {
 		case "rm": {
 			if (hasFlag("--all", "-a")) {
 				const ids =
-					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited -q`
+					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --filter status=created -q`
 						.quiet()
 						.text()
 						.then((s) => s.trim());
 				const names =
-					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --format ${"{{.Names}}"}`
+					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --filter status=created --format ${"{{.Names}}"}`
 						.quiet()
 						.text()
 						.then((s) => s.trim());
 				if (ids) {
 					for (const id of ids.split("\n")) {
-						await run($`docker rm ${id}`);
+						await run($`docker rm -f ${id}`);
 					}
 					for (const n of names.split("\n")) {
 						await $`docker volume rm ${n}`.nothrow().quiet();
@@ -529,7 +626,7 @@ try {
 			} else {
 				const id = args[1];
 				if (!id) die("usage: yolomode rm <name> [-a | --all]");
-				await run($`docker rm ${id}`);
+				await run($`docker rm -f ${id}`);
 				await $`docker volume rm ${id}`.nothrow().quiet();
 				console.log(`${pc.green("✔")} Removed ${pc.cyan(id)}`);
 			}
