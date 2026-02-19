@@ -67,7 +67,8 @@ ENV MISE_DATA_DIR=/opt/mise \
     MISE_CONFIG_DIR=/opt/mise/config
 
 # Writable package manager homes for runtime installs
-ENV CARGO_HOME=/home/yolo/.cargo \
+ENV RUSTUP_HOME=/opt/rustup \
+    CARGO_HOME=/home/yolo/.cargo \
     GOPATH=/home/yolo/go \
     UV_CACHE_DIR=/home/yolo/.cache/uv \
     UV_TOOL_BIN_DIR=/home/yolo/.local/bin \
