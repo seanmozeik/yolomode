@@ -174,10 +174,13 @@ try {
 
 			await checkDockerMemory();
 
-			// --- Claude auth ---
-			const claudeDir = join(HOME, ".claude");
-			if (await dirExists(claudeDir)) {
-				mounts.push("-v", `${claudeDir}:/host-claude/.claude:ro`);
+			// --- Claude auth: keychain creds + preprocessed config ---
+			const creds = await getClaudeCredentials();
+			if (creds) {
+				const tmp = await mkdtemp(join(tmpdir(), "yolomode-"));
+				const credsPath = join(tmp, "credentials.json");
+				await writeFile(credsPath, creds, { mode: 0o600 });
+				mounts.push("-v", `${credsPath}:/host-claude/.credentials.json:ro`);
 			}
 
 			const claudeJson = join(HOME, ".claude.json");
@@ -188,12 +191,15 @@ try {
 				}
 			}
 
-			const creds = await getClaudeCredentials();
-			if (creds) {
-				const tmp = await mkdtemp(join(tmpdir(), "yolomode-"));
-				const credsPath = join(tmp, "credentials.json");
-				await writeFile(credsPath, creds, { mode: 0o600 });
-				mounts.push("-v", `${credsPath}:/host-claude/.credentials.json:ro`);
+			// --- Claude config: skills, plugins (direct mount) ---
+			const claudeSkills = join(HOME, ".claude", "skills");
+			if (await dirExists(claudeSkills)) {
+				mounts.push("-v", `${claudeSkills}:/home/yolo/.claude/skills:ro`);
+			}
+
+			const claudePlugins = join(HOME, ".claude", "plugins");
+			if (await dirExists(claudePlugins)) {
+				mounts.push("-v", `${claudePlugins}:/home/yolo/.claude/plugins:ro`);
 			}
 
 			// --- Codex auth ---
@@ -214,37 +220,31 @@ try {
 				mounts.push("-v", `${starshipCfg}:/home/yolo/.config/starship.toml:ro`);
 			}
 
-			const claudeSkills = join(HOME, ".claude/skills");
-			if (await dirExists(claudeSkills)) {
-				mounts.push("-v", `${claudeSkills}:/home/yolo/.claude/skills:ro`);
-			}
-
-			const claudePlugins = join(HOME, ".claude/plugins");
-			if (await dirExists(claudePlugins)) {
-				mounts.push("-v", `${claudePlugins}:/home/yolo/.claude/plugins:ro`);
-			}
-
 			console.log(`Starting session: ${name}`);
 
-			const envFlags: string[] = [
+			const dockerArgs = [
+				"run",
+				"-it",
+				"--name",
+				name,
+				"-v",
+				`${process.cwd()}:/src:ro`,
+				...mounts,
 				"-e",
 				"ANTHROPIC_API_KEY",
 				"-e",
 				"OPENAI_API_KEY",
+				...(ghToken ? ["-e", `GH_TOKEN=${ghToken}`] : []),
+				"--cap-drop",
+				"ALL",
+				"--security-opt",
+				"no-new-privileges:true",
+				"--tmpfs",
+				"/tmp:nosuid,size=500m",
+				IMAGE,
 			];
-			if (ghToken) {
-				envFlags.push("-e", `GH_TOKEN=${ghToken}`);
-			}
 
-			await $`docker run -it \
-				--name ${name} \
-				-v ${process.cwd()}:/src:ro \
-				${mounts} \
-				${envFlags} \
-				--cap-drop ALL \
-				--security-opt no-new-privileges:true \
-				--tmpfs /tmp:nosuid,size=500m \
-				${IMAGE}`.nothrow();
+			await $`docker ${dockerArgs}`.nothrow();
 
 			console.log("");
 			console.log(`Session exited: ${name}`);

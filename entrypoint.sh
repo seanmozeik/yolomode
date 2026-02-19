@@ -3,16 +3,13 @@ set -e
 
 # Runs as yolo user (USER yolo in Dockerfile). No root, no su-exec.
 
-# Copy Claude config from host mounts into home dir
-if [ -d /host-claude/.claude ]; then
-  cp -a /host-claude/.claude/. "$HOME/.claude/"
+# Copy staged Claude auth files into home dir
+# (settings, skills, plugins are bind-mounted directly by the CLI)
+if [ -f /host-claude/.credentials.json ]; then
+  cp /host-claude/.credentials.json "$HOME/.claude/.credentials.json"
 fi
 if [ -f /host-claude/.claude.json ]; then
   cp /host-claude/.claude.json "$HOME/.claude.json"
-fi
-if [ -f /host-claude/.credentials.json ]; then
-  mkdir -p "$HOME/.claude"
-  cp /host-claude/.credentials.json "$HOME/.claude/.credentials.json"
 fi
 
 # Copy Codex auth from host mount
