@@ -220,6 +220,10 @@ try {
 				mounts.push("-v", `${starshipCfg}:/home/yolo/.config/starship.toml:ro`);
 			}
 
+			// Named volume for /work — survives container kills and removes
+			await $`docker volume create ${name}`.quiet();
+			await $`docker run --rm -v ${name}:/work alpine chown 1000:1000 /work`.quiet();
+
 			console.log(`Starting session: ${name}`);
 
 			const dockerArgs = [
@@ -227,6 +231,8 @@ try {
 				"-it",
 				"--name",
 				name,
+				"-v",
+				`${name}:/work`,
 				"-v",
 				`${process.cwd()}:/src:ro`,
 				...mounts,
@@ -344,9 +350,17 @@ try {
 						.quiet()
 						.text()
 						.then((s) => s.trim());
+				const names =
+					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --format ${"{{.Names}}"}`
+						.quiet()
+						.text()
+						.then((s) => s.trim());
 				if (ids) {
 					for (const id of ids.split("\n")) {
 						await run($`docker rm ${id}`);
+					}
+					for (const n of names.split("\n")) {
+						await $`docker volume rm ${n}`.nothrow().quiet();
 					}
 					console.log("Cleaned up stopped sessions");
 				} else {
@@ -356,6 +370,7 @@ try {
 				const id = args[1];
 				if (!id) die("usage: yolomode rm <name> [-a | --all]");
 				await run($`docker rm ${id}`);
+				await $`docker volume rm ${id}`.nothrow().quiet();
 			}
 			break;
 		}

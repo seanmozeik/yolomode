@@ -54,8 +54,9 @@ RUN apk add --no-cache \
     build-base openssh-client \
     nodejs npm \
     github-cli mise \
-    libstdc++ ncurses \
-    coreutils findutils grep
+    libstdc++ ncurses gcompat \
+    coreutils findutils grep \
+    zsh-autosuggestions zsh-syntax-highlighting
 
 # Pre-installed tool paths (read-only from build stages)
 ENV BUN_INSTALL=/usr/local/bun
@@ -89,6 +90,8 @@ ENV HOME=/home/yolo
 # Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
 RUN printf '%s\n' \
     'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
+    'source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh' \
+    'source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' \
     'eval "$(starship init zsh)"' \
     'alias cc="claude --dangerously-skip-permissions"' \
     'alias co="codex --full-auto"' \
@@ -104,17 +107,16 @@ RUN printf '%s\n' \
 RUN chown -R yolo:yolo /usr/local/bun
 
 # Prepare writable directories owned by yolo user
-RUN mkdir -p /work /home/yolo/.claude /home/yolo/.codex \
+RUN mkdir -p /home/yolo/.claude /home/yolo/.codex \
     /home/yolo/.cargo/bin /home/yolo/go/bin \
     /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
     /home/yolo/.local/bin \
-    && chown -R yolo:yolo /work /home/yolo
+    && chown -R yolo:yolo /home/yolo
 
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 USER yolo
-WORKDIR /work
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["zsh"]
