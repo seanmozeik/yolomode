@@ -28,10 +28,12 @@ if [ ! -f "$HOME/.yolomode-initialized" ] && [ -d /src ]; then
   if [ -d /src/.git ]; then
     git clone /src /work
     git -C /work remote remove origin
-    git -C /work tag yolomode-base
     cd /src
     git ls-files --others --exclude-standard -z \
       | xargs -0 -I{} cp --parents "{}" /work/ 2>/dev/null || true
+    git -C /work add -A
+    git -C /work -c user.name=yolomode -c user.email=yolo@dev commit --allow-empty -m "yolomode: base snapshot" >/dev/null 2>&1 || true
+    git -C /work tag yolomode-base
   else
     cp -a /src/. /work/
   fi

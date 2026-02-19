@@ -5,8 +5,19 @@ import { tmpdir } from "os";
 import { join } from "path";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
+import pc from "picocolors";
+import boxen from "boxen";
+import { Table } from "console-table-printer";
+import ora from "ora";
 
 const IMAGE = "yolomode";
+
+const BANNER = `                __                          __
+   __  ______  / /___  ____ ___  ____  ____/ /__
+  / / / / __ \\/ / __ \\/ __ \`__ \\/ __ \\/ __  / _ \\
+ / /_/ / /_/ / / /_/ / / / / / / /_/ / /_/ /  __/
+ \\__, /\\____/_/\\____/_/ /_/ /_/\\____/\\__,_/\\___/
+/____/`;
 const HOME = process.env.HOME!;
 
 const ADJECTIVES = [
@@ -73,12 +84,12 @@ function hasFlag(...flags: string[]): boolean {
 }
 
 function die(msg: string): never {
-	console.error(`yolomode: ${msg}`);
+	console.error(`${pc.red(pc.bold("error:"))} ${msg}`);
 	process.exit(1);
 }
 
 function warn(msg: string) {
-	console.error(`yolomode: warning: ${msg}`);
+	console.error(`${pc.yellow(pc.bold("warning:"))} ${msg}`);
 }
 
 async function run(cmd: ReturnType<typeof $>) {
@@ -159,12 +170,18 @@ try {
 				await writeFile(join(ctx, "entrypoint.sh"), ENTRYPOINT, {
 					mode: 0o755,
 				});
-				console.log(`Building ${IMAGE}...`);
-				if (hasFlag("--no-cache")) {
-					await $`docker build --no-cache -t ${IMAGE} ${ctx}`;
-				} else {
-					await $`docker build -t ${IMAGE} ${ctx}`;
+				const spinner = ora("Building image...").start();
+				const buildArgs = hasFlag("--no-cache")
+					? ["build", "--no-cache", "-t", IMAGE, ctx]
+					: ["build", "-t", IMAGE, ctx];
+				const result = await $`docker ${buildArgs}`.quiet().nothrow();
+				if (result.exitCode !== 0) {
+					spinner.fail("Build failed");
+					const stderr = result.stderr.toString().trim();
+					if (stderr) console.error(pc.dim(stderr));
+					process.exit(1);
 				}
+				spinner.succeed("Image built");
 			} finally {
 				await rm(ctx, { recursive: true, force: true });
 			}
@@ -176,6 +193,7 @@ try {
 			const mounts: string[] = [];
 
 			await checkDockerMemory();
+			const spinner = ora("Preparing session...").start();
 
 			// --- Claude auth: keychain creds + preprocessed config ---
 			const creds = await getClaudeCredentials();
@@ -224,7 +242,8 @@ try {
 			await $`docker volume create ${name}`.quiet();
 			await $`docker run --rm -v ${name}:/work alpine chown 1000:1000 /work`.quiet();
 
-			console.log(`Starting session: ${name}`);
+			spinner.succeed(`Session ${pc.cyan(pc.bold(name))} ready`);
+			console.log();
 
 			const dockerArgs = [
 				"run",
@@ -255,12 +274,24 @@ try {
 
 			await $`docker ${dockerArgs}`.nothrow();
 
-			console.log("");
-			console.log(`Session exited: ${name}`);
-			console.log(`  Reattach:  yolomode attach ${name}`);
-			console.log(`  Review:    yolomode diff ${name}`);
-			console.log(`  Apply:     yolomode apply ${name}`);
-			console.log(`  Remove:    yolomode rm ${name}`);
+			console.log();
+			console.log(
+				boxen(
+					[
+						`${pc.cyan(pc.bold("attach"))}   yolomode attach ${name}`,
+						`${pc.cyan(pc.bold("diff"))}     yolomode diff ${name}`,
+						`${pc.cyan(pc.bold("apply"))}    yolomode apply ${name}`,
+						`${pc.cyan(pc.bold("rm"))}       yolomode rm ${name}`,
+					].join("\n"),
+					{
+						title: `${name}`,
+						titleAlignment: "left",
+						borderColor: "cyan",
+						borderStyle: "round",
+						padding: { top: 1, bottom: 1, left: 2, right: 2 },
+					},
+				),
+			);
 			break;
 		}
 
@@ -274,7 +305,41 @@ try {
 		}
 
 		case "ls": {
-			await $`docker ps -a --filter ancestor=${IMAGE} --format ${"table {{.Names}}\t{{.Status}}\t{{.CreatedAt}}"}`;
+			const raw = await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{json .}}"}`
+				.quiet()
+				.nothrow()
+				.text();
+			const lines = raw.trim().split("\n").filter(Boolean);
+			if (lines.length === 0) {
+				console.log(pc.dim("No sessions found."));
+				break;
+			}
+			const table = new Table({
+				columns: [
+					{ name: "Name", alignment: "left" },
+					{ name: "Status", alignment: "left" },
+					{ name: "Created", alignment: "left" },
+				],
+				style: {
+					headerTop: { left: "┌", mid: "┬", other: "─", right: "┐" },
+					headerBottom: { left: "├", mid: "┼", other: "─", right: "┤" },
+					tableBottom: { left: "└", mid: "┴", other: "─", right: "┘" },
+					vertical: "│",
+				},
+			});
+			for (const line of lines) {
+				const c = JSON.parse(line);
+				const isRunning = c.State === "running";
+				table.addRow(
+					{
+						Name: c.Names,
+						Status: c.Status,
+						Created: c.CreatedAt,
+					},
+					{ color: isRunning ? "green" : "white" },
+				);
+			}
+			table.printTable();
 			break;
 		}
 
@@ -284,11 +349,11 @@ try {
 			await ensureRunning(id);
 			await $`docker exec ${id} git -C /work add -A`.quiet();
 			const patch =
-				await $`docker exec ${id} git -C /work diff --cached yolomode-base`
+				await $`docker exec ${id} git -C /work diff --cached --full-index yolomode-base`
 					.quiet()
 					.text();
 			if (!patch.trim()) {
-				console.error("No changes.");
+				console.log(pc.dim("No changes."));
 			} else {
 				process.stdout.write(patch);
 			}
@@ -308,7 +373,7 @@ try {
 			await ensureRunning(id);
 			await $`docker exec ${id} git -C /work add -A`.quiet();
 			const patch =
-				await $`docker exec ${id} git -C /work diff --cached yolomode-base`
+				await $`docker exec ${id} git -C /work diff --cached --full-index yolomode-base`
 					.quiet()
 					.text();
 			if (!patch.trim()) die("no changes to apply");
@@ -319,6 +384,7 @@ try {
 				.text()
 				.then((s) => s.trim());
 			const patchFile = join(tmpdir(), `yolomode-${id}.patch`);
+			const spinner = ora("Applying changes...").start();
 			try {
 				await writeFile(patchFile, patch);
 				await $`git checkout -b ${branch}`;
@@ -326,7 +392,7 @@ try {
 				await $`git apply ${patchFile}`;
 				await $`git add -A`;
 				await $`git commit -m ${"yolomode: " + id}`;
-				console.log(`Branch created: ${branch}`);
+				spinner.succeed(`Branch created: ${pc.cyan(pc.bold(branch))}`);
 				await $`git checkout ${base}`;
 			} finally {
 				await rm(patchFile, { force: true });
@@ -337,9 +403,10 @@ try {
 		case "sync": {
 			const id = args[1];
 			if (!id) die("usage: yolomode sync <name>");
-			await $`mkdir -p .yolomode/${id}`;
-			await $`docker cp ${id}:/work/. .yolomode/${id}/`;
-			console.log(`Extracted to .yolomode/${id}/`);
+			const dest = join(HOME, ".yolomode", id);
+			await $`mkdir -p ${dest}`;
+			await $`docker cp ${id}:/work/. ${dest}/`;
+			console.log(`${pc.green("✔")} Extracted to ${pc.cyan(`~/.yolomode/${id}/`)}`);
 			break;
 		}
 
@@ -362,37 +429,47 @@ try {
 					for (const n of names.split("\n")) {
 						await $`docker volume rm ${n}`.nothrow().quiet();
 					}
-					console.log("Cleaned up stopped sessions");
+					console.log(`${pc.green("✔")} Cleaned up stopped sessions`);
 				} else {
-					console.log("No stopped sessions to clean");
+					console.log(pc.dim("No stopped sessions to clean."));
 				}
 			} else {
 				const id = args[1];
 				if (!id) die("usage: yolomode rm <name> [-a | --all]");
 				await run($`docker rm ${id}`);
 				await $`docker volume rm ${id}`.nothrow().quiet();
+				console.log(`${pc.green("✔")} Removed ${pc.cyan(id)}`);
 			}
 			break;
 		}
 
-		default:
-			console.log("Usage: yolomode <command> [args]");
-			console.log("");
-			console.log("Commands:");
+		default: {
 			console.log(
-				"  build          Build the Docker image (--no-cache for force rebuild)",
+				boxen(pc.cyan(BANNER) + "\n\n" + pc.dim("isolated dev sessions"), {
+					borderColor: "cyan",
+					borderStyle: "round",
+					padding: { top: 1, bottom: 1, left: 2, right: 2 },
+					textAlignment: "center",
+				}),
 			);
-			console.log("  run            Start a new isolated session");
-			console.log("  attach <name>  Open a new shell in a session (alias: a)");
-			console.log("  ls             List all sessions");
-			console.log("  diff <name>    Show changes from a session as a patch");
-			console.log("  apply <name>   Apply session changes to a new branch");
-			console.log("  sync <name>    Extract full work dir from a session");
-			console.log(
-				"  rm <name>      Remove a session (-a/--all for all stopped)",
-			);
+			console.log();
+			const cmds = [
+				["build", "Build the Docker image (--no-cache for force rebuild)"],
+				["run", "Start a new isolated session"],
+				["attach <name>", "Open a new shell in a session (alias: a)"],
+				["ls", "List all sessions"],
+				["diff <name>", "Show changes from a session as a patch"],
+				["apply <name>", "Apply session changes to a new branch"],
+				["sync <name>", "Extract full work dir from a session"],
+				["rm <name>", "Remove a session (-a/--all for all stopped)"],
+			];
+			for (const [cmd, desc] of cmds) {
+				console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(16)))}${pc.dim(desc)}`);
+			}
+			console.log();
 			if (command) die(`unknown command: ${command}`);
 			break;
+		}
 	}
 } catch (err: any) {
 	if (err?.exitCode !== undefined) {

@@ -2,3 +2,4 @@
 yolomode
 node_modules/
 bun.lock
+*.bun-build

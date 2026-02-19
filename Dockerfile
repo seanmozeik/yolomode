@@ -23,6 +23,9 @@ RUN cargo-binstall --no-confirm sd
 FROM cargo-base AS tool-starship
 RUN cargo-binstall --no-confirm starship
 
+FROM cargo-base AS tool-just
+RUN cargo-binstall --no-confirm just
+
 # ---- Language runtimes via mise (each on its own layer for caching) ----
 FROM alpine:3.23 AS mise-tools
 RUN apk add --no-cache mise bash curl xz build-base linux-headers zlib-dev \
@@ -78,6 +81,7 @@ COPY --from=tool-ripgrep /root/.cargo/bin/rg /usr/local/bin/
 COPY --from=tool-fd /root/.cargo/bin/fd /usr/local/bin/
 COPY --from=tool-sd /root/.cargo/bin/sd /usr/local/bin/
 COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
+COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup

@@ -36,7 +36,7 @@ First build pulls Alpine, installs mise (python, go, zig, rust), Bun, Claude Cod
 yolomode run
 ```
 
-This creates a named container (e.g., `yolomode-swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell.
+This creates a named container (e.g., `swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell.
 
 From there, install deps, poke around, and launch whichever agent you want:
 
@@ -48,7 +48,7 @@ codex --full-auto
 ### Reattach to a session
 
 ```
-yolomode attach yolomode-swift-fox
+yolomode attach swift-fox
 ```
 
 The container keeps its state after exit. Pick up where you left off.
@@ -59,19 +59,35 @@ The container keeps its state after exit. Pick up where you left off.
 yolomode ls
 ```
 
-### Extract changes
+### Review changes
 
 ```
-yolomode sync yolomode-swift-fox
+yolomode diff swift-fox
 ```
 
-Copies the container's working tree to `.yolomode/yolomode-swift-fox/` on the host. Review with `git diff`, apply with `git format-patch` and `git am`, or just copy files over.
+Shows a unified diff of all changes made inside the session compared to the original repo. Pipe to a file or use for review before applying.
+
+### Apply changes
+
+```
+yolomode apply swift-fox
+```
+
+Creates a new git branch (`yolomode/swift-fox`), applies the session's diff as a commit, then switches back to your original branch. Your working tree must be clean.
+
+### Extract full working tree
+
+```
+yolomode sync swift-fox
+```
+
+Copies the container's entire `/work` directory to `.yolomode/swift-fox/` on the host. Useful when you want to inspect beyond just the diff.
 
 ### Cleanup
 
 ```
-yolomode rm yolomode-swift-fox    # remove one session
-yolomode rm --all                  # remove all stopped sessions
+yolomode rm swift-fox     # remove one session
+yolomode rm --all         # remove all stopped sessions
 ```
 
 ### Force rebuild
