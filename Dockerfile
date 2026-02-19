@@ -90,6 +90,7 @@ COPY --from=mise-tools /opt/cargo /opt/cargo
 # Create non-root user
 RUN addgroup -g 1000 yolo && adduser -u 1000 -G yolo -h /home/yolo -s /bin/zsh -D yolo
 ENV HOME=/home/yolo
+ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
 
 # Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
 RUN printf '%s\n' \
@@ -109,7 +110,8 @@ RUN printf '%s\n' \
 
 # Make global bun dir writable for runtime package installs
 RUN chown -R yolo:yolo /usr/local/bun
-
+RUN mkdir -p /usr/local/share/npm-global && \
+    chown -R yolo:yolo /usr/local/share
 # Prepare writable directories owned by yolo user
 RUN mkdir -p /home/yolo/.claude /home/yolo/.codex \
     /home/yolo/.cargo/bin /home/yolo/go/bin \
