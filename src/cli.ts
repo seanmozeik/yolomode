@@ -254,10 +254,23 @@ try {
 			break;
 		}
 
+		case "a":
 		case "attach": {
 			const id = args[1];
 			if (!id) die("usage: yolomode attach <name>");
-			await $`docker start -ai ${id}`;
+
+			// Check if container is running; if stopped, start it detached first
+			const status = await $`docker inspect -f ${"{{.State.Running}}"} ${id}`
+				.quiet()
+				.nothrow()
+				.text()
+				.then((s) => s.trim());
+			if (status !== "true") {
+				await run($`docker start ${id}`);
+			}
+
+			// Exec a new shell — each attach gets its own independent session
+			await $`docker exec -it -w /work ${id} zsh`.nothrow();
 			break;
 		}
 
@@ -306,7 +319,7 @@ try {
 				"  build          Build the Docker image (--no-cache for force rebuild)",
 			);
 			console.log("  run            Start a new isolated session");
-			console.log("  attach <name>  Reattach to an existing session");
+			console.log("  attach <name>  Open a new shell in a session (alias: a)");
 			console.log("  ls             List all sessions");
 			console.log("  sync <name>    Extract changes from a session");
 			console.log(
