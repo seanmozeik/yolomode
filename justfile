@@ -44,7 +44,7 @@ run:
     -e OPENAI_API_KEY \
     -e CLAUDE_CREDENTIALS="$claude_creds" \
     -e CODEX_AUTH="$codex_auth" \
-    {{image}} zsh
+    {{image}}
   echo ""
   echo "Session exited: $name"
   echo "  Reattach:  just attach $name"

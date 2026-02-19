@@ -22,11 +22,12 @@ fi
 # On first start, copy source into writable work dir (respecting .gitignore)
 if [ ! -f /work/.yolomode-initialized ] && [ -d /src ]; then
   if [ -d /src/.git ]; then
-    # Copy tracked + untracked-but-not-ignored files, plus .git itself
+    # Clone the repo (gets tracked files + history, skips gitignored)
+    git clone /src /work
+    # Copy untracked-but-not-ignored files from source
     cd /src
-    git ls-files -z --cached --others --exclude-standard \
-      | tar -c --null -T - | tar -x -C /work
-    cp -a /src/.git /work/.git
+    git ls-files --others --exclude-standard -z \
+      | xargs -0 -I{} cp --parents "{}" /work/ 2>/dev/null || true
   else
     cp -a /src/. /work/
   fi
