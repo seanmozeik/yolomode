@@ -701,13 +701,24 @@ try {
 
 		case "rm": {
 			if (hasFlag("--all", "-a")) {
+				// Stop all running containers first
+				const runningIds =
+					await $`docker ps --filter ancestor=${IMAGE} -q`
+						.quiet()
+						.text()
+						.then((s) => s.trim());
+				if (runningIds) {
+					for (const id of runningIds.split("\n")) {
+						await $`docker stop ${id}`.quiet().nothrow();
+					}
+				}
 				const ids =
-					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --filter status=created -q`
+					await $`docker ps -a --filter ancestor=${IMAGE} -q`
 						.quiet()
 						.text()
 						.then((s) => s.trim());
 				const names =
-					await $`docker ps -a --filter ancestor=${IMAGE} --filter status=exited --filter status=created --format ${"{{.Names}}"}`
+					await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
 						.quiet()
 						.text()
 						.then((s) => s.trim());
@@ -718,9 +729,9 @@ try {
 					for (const n of names.split("\n")) {
 						await $`docker volume rm ${n}`.nothrow().quiet();
 					}
-					console.log(`${pc.green("✔")} Cleaned up stopped sessions`);
+					console.log(`${pc.green("✔")} Cleaned up all sessions`);
 				} else {
-					console.log(pc.dim("No stopped sessions to clean."));
+					console.log(pc.dim("No sessions to clean."));
 				}
 			} else {
 				const id = args[1];
