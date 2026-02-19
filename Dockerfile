@@ -99,6 +99,8 @@ RUN printf '%s\n' \
     'source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh' \
     'source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' \
     'eval "$(starship init zsh)"' \
+    '_ym_title() { printf "\033]0;ym-%s\007" "$HOST"; }' \
+    'precmd_functions+=(_ym_title)' \
     'alias cc="claude --dangerously-skip-permissions"' \
     'alias co="codex --full-auto"' \
     >> /home/yolo/.zshrc \

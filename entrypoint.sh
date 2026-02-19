@@ -41,4 +41,8 @@ if [ ! -f "$HOME/.yolomode-initialized" ] && [ -d /src ]; then
 fi
 
 cd /work
+
+# Set terminal window title to session name (ym-<container-name>)
+printf '\033]0;ym-%s\007' "$HOSTNAME"
+
 exec "$@"

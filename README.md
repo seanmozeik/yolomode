@@ -36,7 +36,7 @@ First build pulls Alpine, installs mise (python, go, zig, rust), Bun, Claude Cod
 yolomode run
 ```
 
-This creates a named container (e.g., `swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell.
+This creates a named container (e.g., `swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell. The terminal window title is set to `ym-swift-fox` for easy tab identification.
 
 From there, install deps, poke around, and launch whichever agent you want:
 
@@ -45,19 +45,33 @@ claude --dangerously-skip-permissions
 codex --full-auto
 ```
 
+#### Import files into a session
+
+Pass one or more `--import` flags to copy host files or directories into `/tmp/imports/` inside the container (ephemeral — gone when the session ends):
+
+```
+yolomode run --import ~/Downloads/research.md --import ~/Downloads/data/
+```
+
 ### Reattach to a session
 
 ```
 yolomode attach swift-fox
 ```
 
-The container keeps its state after exit. Pick up where you left off.
+The container keeps its state after exit. Pick up where you left off. You can also import files on attach:
+
+```
+yolomode attach swift-fox --import ~/Downloads/new-context.md
+```
 
 ### List sessions
 
 ```
 yolomode ls
 ```
+
+Shows all sessions with their name, source project, status, and creation time. Sessions launched from the same directory show the same project name.
 
 ### Review changes
 

@@ -2,7 +2,7 @@
 import { $ } from "bun";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
-import { join } from "path";
+import { join, resolve, basename } from "path";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
 import pc from "picocolors";
@@ -84,6 +84,65 @@ async function dirExists(path: string): Promise<boolean> {
 
 function hasFlag(...flags: string[]): boolean {
 	return args.some((a) => flags.includes(a));
+}
+
+function getFlags(flag: string): string[] {
+	const values: string[] = [];
+	for (let i = 0; i < args.length; i++) {
+		if (args[i] === flag && i + 1 < args.length) {
+			values.push(args[i + 1]);
+			i++;
+		}
+	}
+	return values;
+}
+
+function parseLabel(
+	labels: string | Record<string, string> | null | undefined,
+	key: string,
+): string {
+	if (!labels) return "";
+	if (typeof labels === "object") return labels[key] ?? "";
+	for (const pair of labels.split(",")) {
+		const eq = pair.indexOf("=");
+		if (eq > 0 && pair.slice(0, eq) === key) return pair.slice(eq + 1);
+	}
+	return "";
+}
+
+async function copyImports(
+	id: string,
+	imports: Array<{ abs: string; base: string }>,
+) {
+	if (imports.length === 0) return;
+	await run($`docker exec ${id} mkdir -p /tmp/imports`);
+	for (const { abs } of imports) {
+		await run($`docker cp ${abs} ${id}:/tmp/imports/`);
+	}
+	const list = imports.map((i) => i.base).join(", ");
+	console.log(`${pc.green("✔")} Imported to /tmp/imports/:  ${pc.dim(list)}`);
+}
+
+async function resolveImports(
+	rawPaths: string[],
+): Promise<Array<{ abs: string; base: string }>> {
+	if (rawPaths.length === 0) return [];
+	const resolved = rawPaths.map((p) => resolve(p));
+	for (const p of resolved) {
+		const exists = await $`test -e ${p}`
+			.nothrow()
+			.quiet()
+			.then((r) => r.exitCode === 0);
+		if (!exists) die(`--import path does not exist: ${p}`);
+	}
+	const entries = resolved.map((p) => ({ abs: p, base: basename(p) }));
+	const seen = new Set<string>();
+	for (const { abs, base } of entries) {
+		if (!base) die(`--import path has no basename: ${abs}`);
+		if (seen.has(base)) die(`--import basename collision: "${base}"`);
+		seen.add(base);
+	}
+	return entries;
 }
 
 function die(msg: string): never {
@@ -195,6 +254,9 @@ try {
 			const name = generateName();
 			const mounts: string[] = [];
 
+			const importPaths = getFlags("--import");
+			const imports = await resolveImports(importPaths);
+
 			await checkDockerMemory();
 			const spinner = ora("Preparing session...").start();
 
@@ -248,11 +310,17 @@ try {
 			spinner.succeed(`Session ${pc.cyan(pc.bold(name))} ready`);
 			console.log();
 
+			const cols = process.stdout.columns || 80;
+			const rows = process.stdout.rows || 24;
+
+			// Start detached so we can copy imports before handing over the shell
 			const dockerArgs = [
 				"run",
-				"-it",
+				"-dit",
 				"--name",
 				name,
+				"--label",
+				`yolomode.src=${process.cwd()}`,
 				"-v",
 				`${name}:/work`,
 				"-v",
@@ -264,6 +332,10 @@ try {
 				"OPENAI_API_KEY",
 				"-e",
 				"TERM",
+				"-e",
+				`COLUMNS=${cols}`,
+				"-e",
+				`LINES=${rows}`,
 				"--cap-drop",
 				"ALL",
 				"--security-opt",
@@ -275,25 +347,31 @@ try {
 				IMAGE,
 			];
 
-			await $`docker ${dockerArgs}`.nothrow();
+			await run($`docker ${dockerArgs}`);
+			await copyImports(name, imports);
+			await $`docker exec -it -e TERM -e COLUMNS=${cols} -e LINES=${rows} -w /work ${name} zsh`.nothrow();
 
 			console.log();
+			const nextStepLines = [
+				`${pc.cyan(pc.bold("attach"))}   yolomode attach ${name}`,
+				`${pc.cyan(pc.bold("diff"))}     yolomode diff ${name}`,
+				`${pc.cyan(pc.bold("apply"))}    yolomode apply ${name}`,
+				`${pc.cyan(pc.bold("rm"))}       yolomode rm ${name}`,
+			];
+			if (imports.length > 0) {
+				const list = imports.map((i) => i.base).join(", ");
+				nextStepLines.push(
+					`${pc.cyan(pc.bold("imports"))}  /tmp/imports/  ${pc.dim(`(${list})`)}`,
+				);
+			}
 			console.log(
-				boxen(
-					[
-						`${pc.cyan(pc.bold("attach"))}   yolomode attach ${name}`,
-						`${pc.cyan(pc.bold("diff"))}     yolomode diff ${name}`,
-						`${pc.cyan(pc.bold("apply"))}    yolomode apply ${name}`,
-						`${pc.cyan(pc.bold("rm"))}       yolomode rm ${name}`,
-					].join("\n"),
-					{
-						title: `${name}`,
-						titleAlignment: "left",
-						borderColor: "cyan",
-						borderStyle: "round",
-						padding: { top: 1, bottom: 1, left: 2, right: 2 },
-					},
-				),
+				boxen(nextStepLines.join("\n"), {
+					title: `${name}`,
+					titleAlignment: "left",
+					borderColor: "cyan",
+					borderStyle: "round",
+					padding: { top: 1, bottom: 1, left: 2, right: 2 },
+				}),
 			);
 			break;
 		}
@@ -301,9 +379,15 @@ try {
 		case "a":
 		case "attach": {
 			const id = args[1];
-			if (!id) die("usage: yolomode attach <name>");
+			if (!id || id.startsWith("--"))
+				die("usage: yolomode attach <name> [--import <path>]...");
+			const importPaths = getFlags("--import");
+			const imports = await resolveImports(importPaths);
 			await ensureRunning(id);
-			await $`docker exec -it -e TERM -w /work ${id} zsh`.nothrow();
+			await copyImports(id, imports);
+			const cols = process.stdout.columns || 80;
+			const rows = process.stdout.rows || 24;
+			await $`docker exec -it -e TERM -e COLUMNS=${cols} -e LINES=${rows} -w /work ${id} zsh`.nothrow();
 			break;
 		}
 
@@ -321,6 +405,7 @@ try {
 			const table = new Table({
 				columns: [
 					{ name: "Name", alignment: "left" },
+					{ name: "Project", alignment: "left" },
 					{ name: "Status", alignment: "left" },
 					{ name: "Created", alignment: "left" },
 				],
@@ -334,9 +419,11 @@ try {
 			for (const line of lines) {
 				const c = JSON.parse(line);
 				const isRunning = c.State === "running";
+				const src = parseLabel(c.Labels, "yolomode.src");
 				table.addRow(
 					{
 						Name: c.Names,
+						Project: src ? basename(src) : "",
 						Status: c.Status,
 						Created: c.CreatedAt,
 					},
@@ -461,8 +548,14 @@ try {
 			console.log();
 			const cmds = [
 				["build", "Build the Docker image (--no-cache for force rebuild)"],
-				["run", "Start a new isolated session"],
-				["attach <name>", "Open a new shell in a session (alias: a)"],
+				[
+					"run",
+					"Start a new isolated session  (--import <path> to copy files in)",
+				],
+				[
+					"attach <name>",
+					"Open a new shell in a session (alias: a)  (--import <path>)",
+				],
 				["ls", "List all sessions"],
 				["diff <name>", "Show changes from a session as a patch"],
 				["apply <name>", "Apply session changes to a new branch"],
