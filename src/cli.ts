@@ -387,8 +387,22 @@ try {
 				`COLUMNS=${cols}`,
 				"-e",
 				`LINES=${rows}`,
-				...(gitName ? ["-e", `GIT_AUTHOR_NAME=${gitName}`, "-e", `GIT_COMMITTER_NAME=${gitName}`] : []),
-				...(gitEmail ? ["-e", `GIT_AUTHOR_EMAIL=${gitEmail}`, "-e", `GIT_COMMITTER_EMAIL=${gitEmail}`] : []),
+				...(gitName
+					? [
+							"-e",
+							`GIT_AUTHOR_NAME=${gitName}`,
+							"-e",
+							`GIT_COMMITTER_NAME=${gitName}`,
+						]
+					: []),
+				...(gitEmail
+					? [
+							"-e",
+							`GIT_AUTHOR_EMAIL=${gitEmail}`,
+							"-e",
+							`GIT_COMMITTER_EMAIL=${gitEmail}`,
+						]
+					: []),
 				"--cap-drop",
 				"ALL",
 				"--security-opt",
@@ -405,8 +419,23 @@ try {
 			await run($`docker ${dockerArgs}`);
 			await copyImports(name, imports);
 			await Bun.spawn(
-				["docker", "exec", "-it", "-e", "TERM", "-e", `COLUMNS=${cols}`, "-e", `LINES=${rows}`, "-w", "/work", name,
-				 "sh", "-c", `stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`],
+				[
+					"docker",
+					"exec",
+					"-it",
+					"-e",
+					"TERM",
+					"-e",
+					`COLUMNS=${cols}`,
+					"-e",
+					`LINES=${rows}`,
+					"-w",
+					"/work",
+					name,
+					"sh",
+					"-c",
+					`stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`,
+				],
 				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
 			).exited;
 
@@ -445,12 +474,7 @@ try {
 						.quiet()
 						.nothrow()
 						.text()
-						.then((s) =>
-							s
-								.trim()
-								.split("\n")
-								.filter(Boolean),
-						);
+						.then((s) => s.trim().split("\n").filter(Boolean));
 				if (running.length === 1) {
 					id = running[0];
 				} else if (running.length === 0) {
@@ -468,8 +492,23 @@ try {
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
 			await Bun.spawn(
-				["docker", "exec", "-it", "-e", "TERM", "-e", `COLUMNS=${cols}`, "-e", `LINES=${rows}`, "-w", "/work", id,
-				 "sh", "-c", `stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`],
+				[
+					"docker",
+					"exec",
+					"-it",
+					"-e",
+					"TERM",
+					"-e",
+					`COLUMNS=${cols}`,
+					"-e",
+					`LINES=${rows}`,
+					"-w",
+					"/work",
+					id,
+					"sh",
+					"-c",
+					`stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`,
+				],
 				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
 			).exited;
 			break;
@@ -541,7 +580,7 @@ try {
 
 			// Warn if applying from a different directory than where the session was created
 			const srcLabel =
-				await $`docker inspect --format ${"{{index .Config.Labels \"yolomode.src\"}}"} ${id}`
+				await $`docker inspect --format ${'{{index .Config.Labels "yolomode.src"}}'} ${id}`
 					.quiet()
 					.nothrow()
 					.text()
@@ -562,7 +601,9 @@ try {
 				.split("\n")
 				.filter((l) => l.length > 0 && !l.startsWith("??"));
 			if (conflicting.length > 0)
-				die("working tree has uncommitted tracked changes — commit or stash first");
+				die(
+					"working tree has uncommitted tracked changes — commit or stash first",
+				);
 
 			await ensureRunning(id);
 
@@ -601,12 +642,17 @@ try {
 				branchCreated = true;
 
 				if (commits.length > 0) {
-					// format-patch preserves individual commit messages and authorship
-					await $`docker exec ${id} sh -c ${"rm -rf /tmp/ym-patches && mkdir /tmp/ym-patches && git -C /work format-patch --binary yolomode-base..HEAD -o /tmp/ym-patches/"}`
-						.quiet();
+					// format-patch preserves individual commit messages and authorship.
+					// Use /home/yolo (not /tmp) — docker cp reads from the overlay layer,
+					// which is hidden by the --tmpfs mount on /tmp.
+					await $`docker exec ${id} sh -c ${"rm -rf /home/yolo/ym-patches && mkdir /home/yolo/ym-patches && git -C /work format-patch --binary yolomode-base..HEAD -o /home/yolo/ym-patches/"}`.quiet();
 					await $`mkdir -p ${patchDir}`;
-					await $`docker cp ${id}:/tmp/ym-patches ${patchDir}`;
-					await $`git am --3way ${join(patchDir, "ym-patches")}`;
+					await $`docker cp ${id}:/home/yolo/ym-patches ${patchDir}`;
+					const patchesDir = join(patchDir, "ym-patches");
+					const patches = [...new Bun.Glob("*.patch").scanSync(patchesDir)]
+						.sort()
+						.map((f) => join(patchesDir, f));
+					await $`git am --3way ${patches}`;
 					committedCount = commits.length;
 				}
 
