@@ -23,6 +23,14 @@ if [ -f /host-codex/auth.json ]; then
   cp /host-codex/auth.json "$HOME/.codex/auth.json"
 fi
 
+# Propagate host git identity into container's global config
+if [ -n "$GIT_AUTHOR_NAME" ]; then
+  git config --global user.name "$GIT_AUTHOR_NAME"
+fi
+if [ -n "$GIT_AUTHOR_EMAIL" ]; then
+  git config --global user.email "$GIT_AUTHOR_EMAIL"
+fi
+
 # On first start, copy source into writable work dir (respecting .gitignore)
 if [ ! -f "$HOME/.yolomode-initialized" ] && [ -d /src ]; then
   if [ -d /src/.git ]; then
@@ -32,7 +40,7 @@ if [ ! -f "$HOME/.yolomode-initialized" ] && [ -d /src ]; then
     git ls-files --others --exclude-standard -z \
       | xargs -0 -I{} cp --parents "{}" /work/ 2>/dev/null || true
     git -C /work add -A
-    git -C /work -c user.name=yolomode -c user.email=yolo@dev commit --allow-empty -m "yolomode: base snapshot" >/dev/null 2>&1 || true
+    git -C /work commit --allow-empty -m "yolomode: base snapshot" >/dev/null 2>&1 || true
     git -C /work tag yolomode-base
   else
     cp -a /src/. /work/

@@ -2,7 +2,7 @@
 import { $ } from "bun";
 import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
-import { join, resolve, basename } from "path";
+import { join, resolve, basename, dirname } from "path";
 import { createInterface } from "readline";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
@@ -128,8 +128,13 @@ async function copyImports(
 ) {
 	if (imports.length === 0) return;
 	await run($`docker exec ${id} mkdir -p /tmp/imports`);
-	for (const { abs } of imports) {
-		await run($`docker cp ${abs} ${id}:/tmp/imports/`);
+	for (const { abs, base } of imports) {
+		// Use tar|docker exec instead of docker cp — docker cp writes to the
+		// container's writable layer which is hidden by the --tmpfs mount on /tmp.
+		const dir = dirname(abs);
+		await run(
+			$`tar -cf - -C ${dir} ${base} | docker exec -i ${id} tar -xf - -C /tmp/imports/`,
+		);
 	}
 	const list = imports.map((i) => i.base).join(", ");
 	console.log(`${pc.green("✔")} Imported to /tmp/imports/:  ${pc.dim(list)}`);
@@ -323,6 +328,18 @@ try {
 				mounts.push("-v", `${codexAuth}:/host-codex/auth.json:ro`);
 			}
 
+			// --- Host git identity ---
+			const gitName = await $`git config --global user.name`
+				.quiet()
+				.nothrow()
+				.text()
+				.then((s) => s.trim());
+			const gitEmail = await $`git config --global user.email`
+				.quiet()
+				.nothrow()
+				.text()
+				.then((s) => s.trim());
+
 			// --- Optional host config ---
 			const starshipCfg = join(
 				process.env.XDG_CONFIG_HOME || join(HOME, ".config"),
@@ -365,6 +382,8 @@ try {
 				`COLUMNS=${cols}`,
 				"-e",
 				`LINES=${rows}`,
+				...(gitName ? ["-e", `GIT_AUTHOR_NAME=${gitName}`, "-e", `GIT_COMMITTER_NAME=${gitName}`] : []),
+				...(gitEmail ? ["-e", `GIT_AUTHOR_EMAIL=${gitEmail}`, "-e", `GIT_COMMITTER_EMAIL=${gitEmail}`] : []),
 				"--cap-drop",
 				"ALL",
 				"--security-opt",
@@ -380,7 +399,11 @@ try {
 
 			await run($`docker ${dockerArgs}`);
 			await copyImports(name, imports);
-			await $`docker exec -it -e TERM -e COLUMNS=${cols} -e LINES=${rows} -w /work ${name} zsh`.nothrow();
+			await Bun.spawn(
+				["docker", "exec", "-it", "-e", "TERM", "-e", `COLUMNS=${cols}`, "-e", `LINES=${rows}`, "-w", "/work", name,
+				 "sh", "-c", `stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`],
+				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+			).exited;
 
 			console.log();
 			const nextStepLines = [
@@ -409,16 +432,41 @@ try {
 
 		case "a":
 		case "attach": {
-			const id = args[1];
-			if (!id || id.startsWith("--"))
-				die("usage: yolomode attach <name> [--import <path>]...");
+			let id = args[1];
+			if (!id || id.startsWith("--")) {
+				// If exactly one container is running, attach to it automatically
+				const running =
+					await $`docker ps --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
+						.quiet()
+						.nothrow()
+						.text()
+						.then((s) =>
+							s
+								.trim()
+								.split("\n")
+								.filter(Boolean),
+						);
+				if (running.length === 1) {
+					id = running[0];
+				} else if (running.length === 0) {
+					die("no running sessions — start one with: yolomode run");
+				} else {
+					die(
+						`${running.length} sessions running — specify a name:\n${running.map((n) => `  ${n}`).join("\n")}`,
+					);
+				}
+			}
 			const importPaths = getFlags("--import");
 			const imports = await resolveImports(importPaths);
 			await ensureRunning(id);
 			await copyImports(id, imports);
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
-			await $`docker exec -it -e TERM -e COLUMNS=${cols} -e LINES=${rows} -w /work ${id} zsh`.nothrow();
+			await Bun.spawn(
+				["docker", "exec", "-it", "-e", "TERM", "-e", `COLUMNS=${cols}`, "-e", `LINES=${rows}`, "-w", "/work", id,
+				 "sh", "-c", `stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`],
+				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
+			).exited;
 			break;
 		}
 
