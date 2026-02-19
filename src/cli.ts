@@ -12,12 +12,15 @@ import ora from "ora";
 
 const IMAGE = "yolomode";
 
-const BANNER = `                __                          __
-   __  ______  / /___  ____ ___  ____  ____/ /__
-  / / / / __ \\/ / __ \\/ __ \`__ \\/ __ \\/ __  / _ \\
- / /_/ / /_/ / / /_/ / / / / / / /_/ / /_/ /  __/
- \\__, /\\____/_/\\____/_/ /_/ /_/\\____/\\__,_/\\___/
-/____/`;
+const BANNER = `             _                           _      
+            | |                         | |     
+ _   _  ___ | | ___  _ __ ___   ___   __| | ___ 
+| | | |/ _ \\| |/ _ \\| '_ \` _ \\ / _ \\ / _\` |/ _ \\
+| |_| | (_) | | (_) | | | | | | (_) | (_| |  __/
+ \\__, |\\___/|_|\\___/|_| |_| |_|\\___/ \\__,_|\\___|
+  __/ |                                         
+ |___/                                          
+`;
 const HOME = process.env.HOME!;
 
 const ADJECTIVES = [
@@ -305,10 +308,11 @@ try {
 		}
 
 		case "ls": {
-			const raw = await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{json .}}"}`
-				.quiet()
-				.nothrow()
-				.text();
+			const raw =
+				await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{json .}}"}`
+					.quiet()
+					.nothrow()
+					.text();
 			const lines = raw.trim().split("\n").filter(Boolean);
 			if (lines.length === 0) {
 				console.log(pc.dim("No sessions found."));
@@ -406,7 +410,9 @@ try {
 			const dest = join(HOME, ".yolomode", id);
 			await $`mkdir -p ${dest}`;
 			await $`docker cp ${id}:/work/. ${dest}/`;
-			console.log(`${pc.green("✔")} Extracted to ${pc.cyan(`~/.yolomode/${id}/`)}`);
+			console.log(
+				`${pc.green("✔")} Extracted to ${pc.cyan(`~/.yolomode/${id}/`)}`,
+			);
 			break;
 		}
 
