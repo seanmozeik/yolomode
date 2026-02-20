@@ -4,11 +4,18 @@ import { tmpdir } from "os";
 import { join } from "path";
 import pc from "picocolors";
 import ora from "ora";
-import { die, warn, confirm, ensureRunning, run, getWorkDir } from "./utils";
+import {
+	die,
+	warn,
+	confirm,
+	ensureRunning,
+	run,
+	getWorkDir,
+	resolveSession,
+} from "./utils";
 
 export async function cmdApply(args: string[]) {
-	const id = args[1];
-	if (!id) die("usage: yolomode apply <name>");
+	const id = await resolveSession(args[1]);
 
 	// Warn if applying from a different directory than where the session was created
 	const srcLabel =

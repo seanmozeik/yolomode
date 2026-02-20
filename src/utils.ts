@@ -114,6 +114,34 @@ export async function getWorkDir(id: string): Promise<string> {
 		.then((s) => s.trim() || "/home/yolo/project");
 }
 
+// ── Session resolution ──────────────────────────────────────────
+
+// Resolve a session name from user input, auto-selecting if there is exactly
+// one container. Pass { all: true } to include stopped containers (e.g. rm).
+export async function resolveSession(
+	id: string | undefined,
+	opts: { all?: boolean } = {},
+): Promise<string> {
+	if (id && !id.startsWith("--")) return id;
+	const psArgs = opts.all ? ["-a"] : [];
+	const sessions =
+		await $`docker ps ${psArgs} --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
+			.quiet()
+			.nothrow()
+			.text()
+			.then((s) => s.trim().split("\n").filter(Boolean));
+	if (sessions.length === 1) return sessions[0];
+	if (sessions.length === 0)
+		die(
+			opts.all
+				? "no sessions — start one with: yolomode run"
+				: "no running sessions — start one with: yolomode run",
+		);
+	die(
+		`${sessions.length} sessions — specify a name:\n${sessions.map((n) => `  ${n}`).join("\n")}`,
+	);
+}
+
 // ── Session naming ──────────────────────────────────────────────
 
 export function generateName(): string {

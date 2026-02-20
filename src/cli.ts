@@ -22,6 +22,7 @@ import {
 	resolveImports,
 	copyImports,
 	getWorkDir,
+	resolveSession,
 } from "./utils";
 import { cmdRun } from "./cmd-run";
 import { cmdApply } from "./cmd-apply";
@@ -212,8 +213,7 @@ try {
 		}
 
 		case "diff": {
-			const id = args[1];
-			if (!id) die("usage: yolomode diff <name>");
+			const id = await resolveSession(args[1]);
 			await ensureRunning(id);
 			const workDir = await getWorkDir(id);
 			await $`docker exec ${id} git -C ${workDir} add -A`.quiet();
@@ -249,46 +249,58 @@ try {
 
 		case "rm": {
 			if (hasFlag(args, "--all", "-a")) {
-				const runningIds = await $`docker ps --filter ancestor=${IMAGE} -q`
-					.quiet()
-					.text()
-					.then((s) => s.trim());
-				if (runningIds) {
-					for (const id of runningIds.split("\n")) {
-						await $`docker stop ${id}`.quiet().nothrow();
-					}
-				}
-				const ids = await $`docker ps -a --filter ancestor=${IMAGE} -q`
-					.quiet()
-					.text()
-					.then((s) => s.trim());
-				const names =
-					await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
+				const spinner = ora("Removing all sessions...").start();
+				try {
+					const runningIds = await $`docker ps --filter ancestor=${IMAGE} -q`
 						.quiet()
 						.text()
 						.then((s) => s.trim());
-				if (ids) {
-					for (const id of ids.split("\n")) {
-						await cleanupTmpdirs(id);
-						await run($`docker rm -f ${id}`);
+					if (runningIds) {
+						for (const id of runningIds.split("\n")) {
+							await $`docker stop ${id}`.quiet().nothrow();
+						}
 					}
-					for (const n of names.split("\n")) {
-						await $`docker volume rm ${n}`.nothrow().quiet();
+					const ids = await $`docker ps -a --filter ancestor=${IMAGE} -q`
+						.quiet()
+						.text()
+						.then((s) => s.trim());
+					const names =
+						await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
+							.quiet()
+							.text()
+							.then((s) => s.trim());
+					if (ids) {
+						for (const id of ids.split("\n")) {
+							await cleanupTmpdirs(id);
+							await $`docker rm -f ${id}`.quiet().nothrow();
+						}
+						for (const n of names.split("\n")) {
+							await $`docker volume rm ${n}`.nothrow().quiet();
+						}
+						spinner.succeed("Cleaned up all sessions");
+					} else {
+						spinner.stop();
+						console.log(pc.dim("No sessions to clean."));
 					}
-					console.log(`${pc.green("✔")} Cleaned up all sessions`);
-				} else {
-					console.log(pc.dim("No sessions to clean."));
+				} catch (e) {
+					spinner.fail("Failed to clean up sessions");
+					throw e;
 				}
 			} else {
-				const id = args[1];
-				if (!id) die("usage: yolomode rm <name> [-a | --all]");
+				const id = await resolveSession(args[1], { all: true });
 				const inspectResult = await $`docker inspect ${id}`.quiet().nothrow();
 				if (inspectResult.exitCode !== 0) die(`no such container: ${id}`);
-				await cleanupTmpdirs(id);
-				await $`docker stop ${id}`.quiet().nothrow();
-				await run($`docker rm ${id}`);
-				await $`docker volume rm ${id}`.nothrow().quiet();
-				console.log(`${pc.green("✔")} Removed ${pc.cyan(id)}`);
+				const spinner = ora(`Removing ${id}...`).start();
+				try {
+					await cleanupTmpdirs(id);
+					await $`docker stop ${id}`.quiet().nothrow();
+					await $`docker rm ${id}`.quiet().nothrow();
+					await $`docker volume rm ${id}`.nothrow().quiet();
+					spinner.succeed(`Removed ${pc.cyan(id)}`);
+				} catch (e) {
+					spinner.fail(`Failed to remove ${id}`);
+					throw e;
+				}
 			}
 			break;
 		}

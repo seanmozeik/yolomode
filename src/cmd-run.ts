@@ -33,10 +33,15 @@ async function preprocessClaudeConfig(srcPath: string): Promise<string> {
 		const data = await readFile(srcPath, "utf-8");
 		const config = JSON.parse(data);
 		delete config.installMethod;
+		// Replace any host home dir paths (e.g. plugin marketplace cache) with the container home
+		const serialized = JSON.stringify(config, null, 2).replaceAll(
+			HOME,
+			"/home/yolo",
+		);
 		const tmpDir = join(HOME, ".yolomode", "tmp");
 		await $`mkdir -p ${tmpDir}`.quiet();
 		const tmpPath = join(tmpDir, "claude-config.json");
-		await writeFile(tmpPath, JSON.stringify(config, null, 2), { mode: 0o644 });
+		await writeFile(tmpPath, serialized, { mode: 0o644 });
 		return tmpPath;
 	} catch {
 		return "";
