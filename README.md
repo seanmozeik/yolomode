@@ -182,6 +182,31 @@ source ~/.config/nushell/yolomode.nu
 
 Completions include all subcommands, flags, and dynamic session name completion (for attach, diff, apply, sync, rm, ralph).
 
+### Aliases
+
+If you alias `yolomode` (e.g. `alias ym=yolomode`), pass the alias name as an extra argument to register completions for it too:
+
+```bash
+# Bash
+eval "$(yolomode completions bash ym)"
+
+# Zsh
+eval "$(yolomode completions zsh ym)"
+
+# Fish
+yolomode completions fish ym | source
+```
+
+Multiple aliases are supported: `yolomode completions zsh ym y`.
+
+For Nushell, pass the alias as an argument — it generates both `export alias` and duplicate `export extern` blocks so subcommand completions work:
+
+```nu
+# In config.nu or a sourced file
+yolomode completions nu ym | save -f ~/.config/nushell/yolomode.nu
+source ~/.config/nushell/yolomode.nu
+```
+
 ## Configuration
 
 ### Claude Code settings

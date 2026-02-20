@@ -37,6 +37,14 @@ _yolomode() {
 complete -F _yolomode yolomode
 `;
 
+function bashWithAliases(aliases: string[]): string {
+	if (aliases.length === 0) return COMPLETION_BASH;
+	return (
+		COMPLETION_BASH +
+		aliases.map((a) => `complete -F _yolomode ${a}\n`).join("")
+	);
+}
+
 const COMPLETION_ZSH = `\
 _yolomode() {
     local -a commands
@@ -91,6 +99,13 @@ _yolomode() {
 compdef _yolomode yolomode
 `;
 
+function zshWithAliases(aliases: string[]): string {
+	if (aliases.length === 0) return COMPLETION_ZSH;
+	return (
+		COMPLETION_ZSH + aliases.map((a) => `compdef _yolomode ${a}\n`).join("")
+	);
+}
+
 const COMPLETION_FISH = `\
 # Disable file completions for yolomode
 complete -c yolomode -f
@@ -123,7 +138,16 @@ complete -c yolomode -n '__fish_seen_subcommand_from run' -l no-cache -d 'Force 
 complete -c yolomode -n '__fish_seen_subcommand_from completions' -a 'bash zsh fish nu' -f
 `;
 
-const COMPLETION_NUSHELL = `\
+function fishWithAliases(aliases: string[]): string {
+	if (aliases.length === 0) return COMPLETION_FISH;
+	// fish `--wraps` tells it to reuse all completions from the wrapped command
+	const wraps = aliases
+		.map((a) => `complete -c ${a} --wraps yolomode -d 'yolomode alias'\n`)
+		.join("");
+	return COMPLETION_FISH + wraps;
+}
+
+const COMPLETION_NU_HELPERS = `\
 def "nu complete yolomode commands" [] {
     [
         { value: "build", description: "Build the Docker image" }
@@ -146,72 +170,88 @@ def "nu complete yolomode sessions" [] {
 def "nu complete yolomode shells" [] {
     ["bash" "zsh" "fish" "nu"]
 }
+`;
 
-export extern "yolomode" [
+function nuExterns(cmd: string): string {
+	return `
+export extern "${cmd}" [
     command?: string@"nu complete yolomode commands"
 ]
 
-export extern "yolomode build" [
+export extern "${cmd} build" [
     --no-cache    # Force rebuild without cache
 ]
 
-export extern "yolomode run" [
+export extern "${cmd} run" [
     --import: string    # Copy file/dir into session
     --memory: string    # Memory limit (default: 16g)
     --no-cache          # Force rebuild without cache
 ]
 
-export extern "yolomode attach" [
+export extern "${cmd} attach" [
     name?: string@"nu complete yolomode sessions"
     --import: string    # Copy file/dir into session
 ]
 
-export extern "yolomode diff" [
+export extern "${cmd} diff" [
     name: string@"nu complete yolomode sessions"
 ]
 
-export extern "yolomode apply" [
+export extern "${cmd} apply" [
     name: string@"nu complete yolomode sessions"
 ]
 
-export extern "yolomode sync" [
+export extern "${cmd} sync" [
     name: string@"nu complete yolomode sessions"
 ]
 
-export extern "yolomode rm" [
+export extern "${cmd} rm" [
     name?: string@"nu complete yolomode sessions"
     --all(-a)    # Remove all sessions
 ]
 
-export extern "yolomode ralph" [
+export extern "${cmd} ralph" [
     name: string@"nu complete yolomode sessions"
     --max-iterations: int    # Max loop iterations (default: 10)
 ]
 
-export extern "yolomode completions" [
+export extern "${cmd} completions" [
     shell: string@"nu complete yolomode shells"
 ]
 
-export extern "yolomode ls" []
+export extern "${cmd} ls" []
 `;
+}
+
+function nushellWithAliases(aliases: string[]): string {
+	const aliasDefs = aliases
+		.map((a) => `export alias ${a} = yolomode\n`)
+		.join("");
+	const aliasExterns = aliases.map((a) => nuExterns(a)).join("");
+	return (
+		COMPLETION_NU_HELPERS + nuExterns("yolomode") + aliasDefs + aliasExterns
+	);
+}
 
 export async function cmdCompletions(args: string[]) {
 	const shell = args[1];
-	if (!shell) die("usage: yolomode completions <bash|zsh|fish|nu>");
+	if (!shell) die("usage: yolomode completions <bash|zsh|fish|nu> [alias...]");
+
+	const aliases = args.slice(2).filter((a) => !a.startsWith("-"));
 
 	switch (shell) {
 		case "bash":
-			process.stdout.write(COMPLETION_BASH);
+			process.stdout.write(bashWithAliases(aliases));
 			break;
 		case "zsh":
-			process.stdout.write(COMPLETION_ZSH);
+			process.stdout.write(zshWithAliases(aliases));
 			break;
 		case "fish":
-			process.stdout.write(COMPLETION_FISH);
+			process.stdout.write(fishWithAliases(aliases));
 			break;
 		case "nu":
 		case "nushell":
-			process.stdout.write(COMPLETION_NUSHELL);
+			process.stdout.write(nushellWithAliases(aliases));
 			break;
 		default:
 			die(`unsupported shell: ${shell} (supported: bash, zsh, fish, nu)`);

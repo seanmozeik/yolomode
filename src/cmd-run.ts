@@ -95,11 +95,16 @@ export async function cmdRun(args: string[]) {
 		}
 	}
 
-	// --- Claude config: skills, plugins, root CLAUDE.md (direct mount) ---
+	// --- Claude config: skills (merged with bundled ralph skill), plugins, root CLAUDE.md ---
+	// Build a merged skills temp dir so we don't nest a file mount inside a
+	// read-only directory mount (which causes "read-only file system" from runc).
+	const skillsTmpDir = await mkdtemp(join(tmpdir(), "yolomode-skills-"));
 	const claudeSkills = join(HOME, ".claude", "skills");
 	if (await dirExists(claudeSkills)) {
-		mounts.push("-v", `${claudeSkills}:/home/yolo/.claude/skills:ro`);
+		await $`cp -r ${claudeSkills}/. ${skillsTmpDir}/`.quiet();
 	}
+	await writeFile(join(skillsTmpDir, "ralph.md"), RALPH_SKILL);
+	mounts.push("-v", `${skillsTmpDir}:/home/yolo/.claude/skills:ro`);
 
 	const claudePlugins = join(HOME, ".claude", "plugins");
 	if (await dirExists(claudePlugins)) {
@@ -120,12 +125,6 @@ export async function cmdRun(args: string[]) {
 	if (await Bun.file(yolomodeSettings).exists()) {
 		mounts.push("-v", `${yolomodeSettings}:/host-claude/settings.json:ro`);
 	}
-
-	// --- Bundled ralph skill ---
-	const ralphSkillTmp = await mkdtemp(join(tmpdir(), "yolomode-skill-"));
-	const ralphSkillPath = join(ralphSkillTmp, "ralph.md");
-	await writeFile(ralphSkillPath, RALPH_SKILL);
-	mounts.push("-v", `${ralphSkillPath}:/home/yolo/.claude/skills/ralph.md:ro`);
 
 	// --- Codex auth ---
 	const codexAuth = join(HOME, ".codex", "auth.json");
