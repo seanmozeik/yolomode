@@ -28,13 +28,13 @@ RUN cargo-binstall --no-confirm starship
 FROM cargo-base AS tool-just
 RUN cargo-binstall --no-confirm just
 
-FROM cargo-base AS tool-jaq
-RUN cargo-binstall --no-confirm jaq@3.0.0-beta
-
 # ---- agent-browser (node-based, own stage) ----
-FROM bitnami/node:22 AS agent-browser-tools
-ENV npm_config_prefix=/opt/agent-browser
+FROM bitnami/node:latest AS agent-browser-tools
+ENV npm_config_prefix=/opt/agent-browser \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN npm install -g agent-browser
+# Download Playwright's own Chromium — tested against the exact agent-browser/Playwright version
+RUN /opt/agent-browser/bin/agent-browser install
 # Install skill via skills CLI in CI mode (-y skips prompts, -g global to $HOME, -a targets claude-code)
 ENV HOME=/opt/skills-home
 RUN mkdir -p /opt/skills-home \
@@ -96,11 +96,6 @@ RUN install_packages \
     chromium \
     fonts-liberation fonts-noto-color-emoji
 
-# Chromium wrapper with Docker-safe headless flags
-RUN printf '#!/bin/sh\nexec /usr/bin/chromium --no-sandbox --disable-setuid-sandbox --disable-dev-shm-usage --disable-gpu "$@"\n' \
-    > /usr/local/bin/chromium-headless \
-    && chmod +x /usr/local/bin/chromium-headless
-
 # Pre-installed tool paths (read-only from build stages)
 ENV BUN_INSTALL=/usr/local/bun
 ENV MISE_DATA_DIR=/opt/mise \
@@ -115,7 +110,7 @@ ENV RUSTUP_HOME=/opt/rustup \
     npm_config_prefix=/home/yolo/.local \
     npm_config_cache=/home/yolo/.cache/npm \
     PIP_CACHE_DIR=/home/yolo/.cache/pip \
-    AGENT_BROWSER_EXECUTABLE_PATH=/usr/local/bin/chromium-headless \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
     PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:$BUN_INSTALL/bin:/opt/mise/shims:/opt/cargo/bin:${PATH}"
 
 # Copy tool binaries
@@ -124,8 +119,8 @@ COPY --from=tool-fd /root/.cargo/bin/fd /usr/local/bin/
 COPY --from=tool-sd /root/.cargo/bin/sd /usr/local/bin/
 COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
 COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
-COPY --from=tool-jaq /root/.cargo/bin/jaq /usr/local/bin/
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
+COPY --from=agent-browser-tools /opt/playwright /opt/playwright
 COPY --from=agent-browser-tools /opt/skills-home/.claude/skills/agent-browser /home/yolo/.claude/skills/agent-browser
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
