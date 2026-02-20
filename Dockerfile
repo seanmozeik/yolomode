@@ -38,7 +38,9 @@ FROM cargo-base AS tool-bat
 RUN cargo-binstall --no-confirm bat
 
 # ---- agent-browser (node-based, own stage) ----
-FROM bitnami/node:latest AS agent-browser-tools
+FROM bitnami/node:latest AS node
+
+FROM node AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser \
     PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
 RUN npm install -g agent-browser
@@ -99,7 +101,6 @@ RUN install_packages \
     ca-certificates \
     git-lfs \
     patch rsync \
-    nodejs npm \
     gh mise \
     libncurses5 \
     coreutils findutils grep \
@@ -133,6 +134,10 @@ COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
 COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
+COPY --from=node /opt/bitnami/node /opt/bitnami/node
+RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
+    && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
+    && ln -s /opt/bitnami/node/bin/npx /usr/local/bin/npx
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
 COPY --from=agent-browser-tools /opt/playwright /opt/playwright
 COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
