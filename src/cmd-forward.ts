@@ -54,14 +54,14 @@ async function findAvailablePort(preferred: number): Promise<number> {
 export async function cmdForward(args: string[]): Promise<void> {
   const positional = args.slice(1).filter((a) => !a.startsWith('--'));
   if (positional.length === 0) {
-    die('usage: yolomode forward [name] <container-port|host:container> [--host-port <port>]');
+    die('usage: yolomode forward <container-port|host:container> [name] [--host-port <port>]');
   }
   if (positional.length > 2) {
-    die('usage: yolomode forward [name] <container-port|host:container> [--host-port <port>]');
+    die('usage: yolomode forward <container-port|host:container> [name] [--host-port <port>]');
   }
 
-  const nameArg = positional.length === 2 ? positional[0] : undefined;
-  const portArg = positional.length === 2 ? positional[1] : positional[0];
+  const portArg = positional[0];
+  const nameArg = positional[1];
   const parsed = parsePortSpec(portArg);
 
   const hostPortFlags = getFlags(args, '--host-port');

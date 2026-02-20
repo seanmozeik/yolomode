@@ -300,7 +300,7 @@ try {
           'Start a new isolated session  (--import <path>, --port <container|host:container>)'
         ],
         [
-          'forward [name] <port>',
+          'forward <port> [name]',
           'Forward from running session to localhost  (<container|host:container>)'
         ],
         ['attach <name>', 'Open a new shell in a session (alias: a)  (--import <path>)'],

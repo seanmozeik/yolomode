@@ -74,8 +74,8 @@ For already-running sessions, use `forward`:
 yolomode forward 3000
 
 # pick a specific session
-yolomode forward swift-fox 3000
-yolomode forward swift-fox 8080:3000
+yolomode forward 3000 swift-fox
+yolomode forward 8080:3000 swift-fox
 ```
 
 If the requested localhost port is busy, yolomode picks the next available port automatically.

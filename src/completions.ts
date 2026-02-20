@@ -1,7 +1,7 @@
 import { die } from './utils';
 
 const COMMANDS = 'build run forward attach ls diff apply sync rm completions ralph';
-const SESSION_COMMANDS = 'forward attach a diff apply sync rm';
+const SESSION_COMMANDS = 'attach a diff apply sync rm';
 
 const COMPLETION_BASH = `\
 _yolomode() {
@@ -12,6 +12,13 @@ _yolomode() {
 
     if [[ $COMP_CWORD -eq 1 ]]; then
         COMPREPLY=( $(compgen -W "${COMMANDS}" -- "$cur") )
+        return
+    fi
+
+    if [[ "\${COMP_WORDS[1]}" == "forward" && $COMP_CWORD -eq 3 ]]; then
+        local sessions
+        sessions=$(yolomode --complete sessions 2>/dev/null)
+        COMPREPLY=( $(compgen -W "$sessions" -- "$cur") )
         return
     fi
 
@@ -89,6 +96,14 @@ _yolomode() {
                         '--port[Publish port (CONTAINER or HOST:CONTAINER)]:port:' \\
                         '--no-cache[Force rebuild without cache]'
                     ;;
+                forward)
+                    local -a sessions
+                    sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
+                    _arguments \\
+                        '1:port:' \\
+                        '2:session:compadd -a sessions' \\
+                        '--host-port[Override host localhost port]:port:'
+                    ;;
                 ralph)
                     local -a sessions
                     sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
@@ -127,7 +142,8 @@ complete -c yolomode -n '__fish_use_subcommand' -a completions -d 'Print shell c
 complete -c yolomode -n '__fish_use_subcommand' -a ralph -d 'Run the ralph autonomous loop'
 
 # Session name completions
-complete -c yolomode -n '__fish_seen_subcommand_from forward attach diff apply sync rm' -a '(yolomode --complete sessions 2>/dev/null)' -f
+complete -c yolomode -n '__fish_seen_subcommand_from attach diff apply sync rm' -a '(yolomode --complete sessions 2>/dev/null)' -f
+complete -c yolomode -n '__fish_seen_subcommand_from forward; and __fish_is_nth_token 3' -a '(yolomode --complete sessions 2>/dev/null)' -f
 
 # ralph: agent, session names, flags
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a 'claude codex' -f
@@ -202,8 +218,8 @@ export extern "${cmd} run" [
 ]
 
 export extern "${cmd} forward" [
-    name?: string@"nu complete yolomode sessions"
     port: string
+    name?: string@"nu complete yolomode sessions"
     --host-port: int
 ]
 
@@ -260,13 +276,13 @@ export def "${cmd} attach" [
 }
 
 export def "${cmd} forward" [
-    name?: string@"nu complete yolomode sessions"
     port: string
+    name?: string@"nu complete yolomode sessions"
     --host-port: int
 ] {
     mut args = ["forward"]
-    if $name != null { $args = ($args | append $name) }
     $args = ($args | append $port)
+    if $name != null { $args = ($args | append $name) }
     if $host_port != null { $args = ($args | append ["--host-port", ($host_port | into string)]) }
     yolomode ...$args
 }
