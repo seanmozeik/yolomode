@@ -8,6 +8,7 @@ import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
 import STARSHIP from "../config/starship.toml" with { type: "text" };
 import pc from "picocolors";
 import boxen from "boxen";
+import gradient from "gradient-string";
 import { Table } from "console-table-printer";
 import ora from "ora";
 
@@ -317,12 +318,17 @@ try {
 
 		default: {
 			console.log(
-				boxen(pc.cyan(BANNER) + "\n\n" + pc.dim("isolated dev sessions"), {
-					borderColor: "cyan",
-					borderStyle: "round",
-					padding: { top: 1, bottom: 1, left: 2, right: 2 },
-					textAlignment: "center",
-				}),
+				boxen(
+					gradient(["#ca9ee6", "#f4b8e4", "#babbf1"])(BANNER) +
+						"\n\n" +
+						pc.dim("isolated dev sessions"),
+					{
+						borderColor: "cyan",
+						borderStyle: "round",
+						padding: { top: 1, bottom: 1, left: 2, right: 2 },
+						textAlignment: "center",
+					},
+				),
 			);
 			console.log();
 			const cmds = [
