@@ -5,6 +5,7 @@ import { tmpdir } from "os";
 import { join, basename } from "path";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
+import STARSHIP from "../config/starship.toml" with { type: "text" };
 import pc from "picocolors";
 import boxen from "boxen";
 import { Table } from "console-table-printer";
@@ -20,11 +21,24 @@ import {
 	run,
 	resolveImports,
 	copyImports,
+	getWorkDir,
 } from "./utils";
 import { cmdRun } from "./cmd-run";
 import { cmdApply } from "./cmd-apply";
 import { cmdCompletions } from "./completions";
 import { cmdRalph, RALPH_SH } from "./cmd-ralph";
+
+async function cleanupTmpdirs(id: string) {
+	const label =
+		await $`docker inspect --format ${'{{index .Config.Labels "yolomode.tmpdirs"}}'} ${id}`
+			.quiet()
+			.nothrow()
+			.text()
+			.then((s) => s.trim());
+	for (const dir of label.split("|").filter(Boolean)) {
+		await rm(dir, { recursive: true, force: true });
+	}
+}
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -58,6 +72,7 @@ try {
 				await writeFile(join(ctx, "ralph.sh"), RALPH_SH, {
 					mode: 0o755,
 				});
+				await writeFile(join(ctx, "starship.toml"), STARSHIP);
 				const buildArgs = ["build", "-t", IMAGE];
 				if (hasFlag(args, "--no-cache")) buildArgs.push("--no-cache");
 				buildArgs.push(ctx);
@@ -117,6 +132,7 @@ try {
 			const imports = await resolveImports(importPaths);
 			await ensureRunning(id);
 			await copyImports(id, imports);
+			const workDir = await getWorkDir(id);
 			const cols = process.stdout.columns || 80;
 			const rows = process.stdout.rows || 24;
 			await Bun.spawn(
@@ -131,11 +147,11 @@ try {
 					"-e",
 					`LINES=${rows}`,
 					"-w",
-					"/work",
+					workDir,
 					id,
 					"sh",
 					"-c",
-					`stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`,
+					`stty cols ${cols} rows ${rows} 2>/dev/null; exec nu`,
 				],
 				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
 			).exited;
@@ -199,9 +215,10 @@ try {
 			const id = args[1];
 			if (!id) die("usage: yolomode diff <name>");
 			await ensureRunning(id);
-			await $`docker exec ${id} git -C /work add -A`.quiet();
+			const workDir = await getWorkDir(id);
+			await $`docker exec ${id} git -C ${workDir} add -A`.quiet();
 			const patch =
-				await $`docker exec ${id} git -C /work diff --cached --full-index yolomode-base`
+				await $`docker exec ${id} git -C ${workDir} diff --cached --full-index yolomode-base`
 					.quiet()
 					.text();
 			if (!patch.trim()) {
@@ -220,9 +237,10 @@ try {
 		case "sync": {
 			const id = args[1];
 			if (!id) die("usage: yolomode sync <name>");
+			const workDir = await getWorkDir(id);
 			const dest = join(process.env.HOME!, ".yolomode", id);
 			await $`mkdir -p ${dest}`;
-			await $`docker cp ${id}:/work/. ${dest}/`;
+			await $`docker cp ${id}:${workDir}/. ${dest}/`;
 			console.log(
 				`${pc.green("✔")} Extracted to ${pc.cyan(`~/.yolomode/${id}/`)}`,
 			);
@@ -251,6 +269,7 @@ try {
 						.then((s) => s.trim());
 				if (ids) {
 					for (const id of ids.split("\n")) {
+						await cleanupTmpdirs(id);
 						await run($`docker rm -f ${id}`);
 					}
 					for (const n of names.split("\n")) {
@@ -265,6 +284,7 @@ try {
 				if (!id) die("usage: yolomode rm <name> [-a | --all]");
 				const inspectResult = await $`docker inspect ${id}`.quiet().nothrow();
 				if (inspectResult.exitCode !== 0) die(`no such container: ${id}`);
+				await cleanupTmpdirs(id);
 				await $`docker stop ${id}`.quiet().nothrow();
 				await run($`docker rm ${id}`);
 				await $`docker volume rm ${id}`.nothrow().quiet();

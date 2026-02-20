@@ -1,37 +1,39 @@
 import { mkdir, writeFile } from "fs/promises";
 import { join, dirname } from "path";
 
-import RALPH from "../skills/ralph/SKILL.md" with { type: "text" };
-import PRD from "../skills/prd/SKILL.md" with { type: "text" };
-import AB_SKILL from "../skills/agent-browser/SKILL.md" with { type: "text" };
-import AB_AUTH from "../skills/agent-browser/references/authentication.md" with {
+import RALPH from "../.claude/skills/ralph/SKILL.md" with { type: "text" };
+import PRD from "../.claude/skills/prd/SKILL.md" with { type: "text" };
+import AB_SKILL from "../.claude/skills/agent-browser/SKILL.md" with {
 	type: "text",
 };
-import AB_COMMANDS from "../skills/agent-browser/references/commands.md" with {
+import AB_AUTH from "../.claude/skills/agent-browser/references/authentication.md" with {
 	type: "text",
 };
-import AB_PROFILING from "../skills/agent-browser/references/profiling.md" with {
+import AB_COMMANDS from "../.claude/skills/agent-browser/references/commands.md" with {
 	type: "text",
 };
-import AB_PROXY from "../skills/agent-browser/references/proxy-support.md" with {
+import AB_PROFILING from "../.claude/skills/agent-browser/references/profiling.md" with {
 	type: "text",
 };
-import AB_SESSION from "../skills/agent-browser/references/session-management.md" with {
+import AB_PROXY from "../.claude/skills/agent-browser/references/proxy-support.md" with {
 	type: "text",
 };
-import AB_SNAPSHOT from "../skills/agent-browser/references/snapshot-refs.md" with {
+import AB_SESSION from "../.claude/skills/agent-browser/references/session-management.md" with {
 	type: "text",
 };
-import AB_VIDEO from "../skills/agent-browser/references/video-recording.md" with {
+import AB_SNAPSHOT from "../.claude/skills/agent-browser/references/snapshot-refs.md" with {
 	type: "text",
 };
-import AB_TMPL_AUTH from "../skills/agent-browser/templates/authenticated-session.sh" with {
+import AB_VIDEO from "../.claude/skills/agent-browser/references/video-recording.md" with {
 	type: "text",
 };
-import AB_TMPL_CAPTURE from "../skills/agent-browser/templates/capture-workflow.sh" with {
+import AB_TMPL_AUTH from "../.claude/skills/agent-browser/templates/authenticated-session.sh" with {
 	type: "text",
 };
-import AB_TMPL_FORM from "../skills/agent-browser/templates/form-automation.sh" with {
+import AB_TMPL_CAPTURE from "../.claude/skills/agent-browser/templates/capture-workflow.sh" with {
+	type: "text",
+};
+import AB_TMPL_FORM from "../.claude/skills/agent-browser/templates/form-automation.sh" with {
 	type: "text",
 };
 

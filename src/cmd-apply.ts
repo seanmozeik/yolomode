@@ -4,7 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import pc from "picocolors";
 import ora from "ora";
-import { die, warn, confirm, ensureRunning, run } from "./utils";
+import { die, warn, confirm, ensureRunning, run, getWorkDir } from "./utils";
 
 export async function cmdApply(args: string[]) {
 	const id = args[1];
@@ -36,20 +36,21 @@ export async function cmdApply(args: string[]) {
 		die("working tree has uncommitted tracked changes — commit or stash first");
 
 	await ensureRunning(id);
+	const workDir = await getWorkDir(id);
 
 	// Stage everything in the container
-	await $`docker exec ${id} git -C /work add -A`.quiet();
+	await $`docker exec ${id} git -C ${workDir} add -A`.quiet();
 
 	// Commits since yolomode-base (oldest first)
 	const commits =
-		await $`docker exec ${id} git -C /work log --reverse --format=%H yolomode-base..HEAD`
+		await $`docker exec ${id} git -C ${workDir} log --reverse --format=%H yolomode-base..HEAD`
 			.quiet()
 			.text()
 			.then((s) => s.trim().split("\n").filter(Boolean));
 
 	// Uncommitted WIP above HEAD (staged by git add -A above)
 	const wipPatch =
-		await $`docker exec ${id} git -C /work diff --cached --full-index --binary HEAD`
+		await $`docker exec ${id} git -C ${workDir} diff --cached --full-index --binary HEAD`
 			.quiet()
 			.text();
 	const hasWip = wipPatch.trim().length > 0;
@@ -72,7 +73,7 @@ export async function cmdApply(args: string[]) {
 		branchCreated = true;
 
 		if (commits.length > 0) {
-			await $`docker exec ${id} sh -c ${"rm -rf /home/yolo/ym-patches && mkdir /home/yolo/ym-patches && git -C /work format-patch --binary yolomode-base..HEAD -o /home/yolo/ym-patches/"}`.quiet();
+			await $`docker exec ${id} sh -c ${`rm -rf /home/yolo/ym-patches && mkdir /home/yolo/ym-patches && git -C ${workDir} format-patch --binary yolomode-base..HEAD -o /home/yolo/ym-patches/`}`.quiet();
 			await $`mkdir -p ${patchDir}`;
 			await $`docker cp ${id}:/home/yolo/ym-patches ${patchDir}`;
 			const patchesDir = join(patchDir, "ym-patches");

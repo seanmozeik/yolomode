@@ -1,0 +1,193 @@
+# Get editor completions based on the config schema
+"$schema" = 'https://starship.rs/config-schema.json'
+
+palette = "catppuccin_frappe"
+
+format = """
+[┏━](overlay2) $os[YOLOMODE](bold red) $hostname
+[┃ ](overlay2)$directory$git_branch$git_status$git_state$bun$python$rust$golang$java$cpp$c$cmake
+[┗](overlay2)$character"""
+right_format = "$cmd_duration"
+
+[bun]
+symbol = " "
+format = "[$symbol($version )]($style)"
+
+[character]
+success_symbol = "[━━━━](overlay2)[●](white)"
+error_symbol = "[━━━━](overlay2)[●](bold red)"
+
+[c]
+symbol = " "
+format = "[$symbol]($style)"
+
+[cpp]
+symbol = " "
+format = "[$symbol]($style)"
+
+[cmake]
+symbol = " "
+format = "[$symbol]($style)"
+
+[cmd_duration]
+min_time = 2_000
+style = "bold yellow"
+format = "took [$duration]($style)"
+
+[directory]
+style = "bold teal"
+format = "[$path]($style)[$read_only]($read_only_style) "
+read_only = " 󰌾"
+truncation_length = 3
+truncate_to_repo = true
+truncation_symbol = "…/"
+
+[docker_context]
+symbol = " "
+
+[fill]
+symbol = " "
+
+[git_branch]
+symbol = " "
+style = "bold purple"
+
+[git_commit]
+tag_symbol = '  '
+
+[git_status]
+style = "bold yellow"
+ahead = "⇡${count}"
+behind = "⇣${count}"
+diverged = "⇡${ahead_count}⇣${behind_count}"
+staged = "[+${count}](green)"
+modified = "[!${count}](yellow)"
+untracked = "[?${count}](red)"
+
+[hostname]
+ssh_symbol = " "
+ssh_only = false
+format = "[$hostname](yellow) "
+
+[memory_usage]
+symbol = "󰍛 "
+
+[meson]
+symbol = "󰔷 "
+
+[nodejs]
+symbol = " "
+format = "[$symbol]($style)"
+
+[ocaml]
+symbol = " "
+
+[os]
+disabled = false
+style = "bold white"
+
+[os.symbols]
+Alpaquita = " "
+Alpine = " "
+AlmaLinux = " "
+Amazon = " "
+Android = " "
+Arch = " "
+Artix = " "
+CachyOS = " "
+CentOS = " "
+Debian = " "
+DragonFly = " "
+Emscripten = " "
+EndeavourOS = " "
+Fedora = " "
+FreeBSD = " "
+Garuda = "󰛓 "
+Gentoo = " "
+HardenedBSD = "󰞌 "
+Illumos = "󰈸 "
+Kali = " "
+Linux = " "
+Mabox = " "
+Macos = " "
+Manjaro = " "
+Mariner = " "
+MidnightBSD = " "
+Mint = " "
+NetBSD = " "
+NixOS = " "
+Nobara = " "
+OpenBSD = "󰈺 "
+openSUSE = " "
+OracleLinux = "󰌷 "
+Pop = " "
+Raspbian = " "
+Redhat = " "
+RedHatEnterprise = " "
+RockyLinux = " "
+Redox = "󰀘 "
+Solus = "󰠳 "
+SUSE = " "
+Ubuntu = " "
+Unknown = " "
+Void = " "
+Windows = "󰍲 "
+
+[package]
+symbol = "󰏗 "
+
+[python]
+symbol = " "
+style = "bold yellow"
+format = '[${symbol}${pyenv_prefix}(${version})(\($virtualenv\))]($style) '
+detect_files = ["requirements.txt", "setup.py","pyproject.toml", "Pipfile", "setup.cfg","tox.ini", ".python-version", "uv.lock"]
+
+[ruby]
+symbol = " "
+format = "[$symbol]($style)"
+
+[rust]
+symbol = "󱘗 "
+format = "[$symbol]($style)"
+
+[swift]
+symbol = " "
+format = "[$symbol]($style)"
+
+[time]
+disabled = false
+format = '[\[$time\]](bold white)'
+time_format = "%H:%M"
+
+[username]
+show_always = false
+style_user = "bold yellow"
+style_root = "bold red"
+
+[palettes.catppuccin_frappe]
+rosewater = "#f2d5cf"
+flamingo = "#eebebe"
+pink = "#f4b8e4"
+mauve = "#ca9ee6"
+red = "#e78284"
+maroon = "#ea999c"
+peach = "#ef9f76"
+yellow = "#e5c890"
+green = "#a6d189"
+teal = "#81c8be"
+sky = "#99d1db"
+sapphire = "#85c1dc"
+blue = "#8caaee"
+lavender = "#babbf1"
+text = "#c6d0f5"
+subtext1 = "#b5bfe2"
+subtext0 = "#a5adce"
+overlay2 = "#949cbb"
+overlay1 = "#838ba7"
+overlay0 = "#737994"
+surface2 = "#626880"
+surface1 = "#51576d"
+surface0 = "#414559"
+base = "#303446"
+mantle = "#292c3c"
+crust = "#232634"

@@ -15,6 +15,7 @@ import {
 	copyImports,
 	resolveImports,
 	warn,
+	toWorkDir,
 } from "./utils";
 import { writeBundledSkills } from "./bundled-skills";
 
@@ -67,7 +68,9 @@ async function checkDockerMemory() {
 
 export async function cmdRun(args: string[]) {
 	const name = await generateUniqueName();
+	const workDir = toWorkDir(process.cwd());
 	const mounts: string[] = [];
+	const tmpdirs: string[] = [];
 
 	const importPaths = getFlags(args, "--import");
 	const imports = await resolveImports(importPaths);
@@ -82,6 +85,7 @@ export async function cmdRun(args: string[]) {
 	const creds = await getClaudeCredentials();
 	if (creds) {
 		const tmp = await mkdtemp(join(tmpdir(), "yolomode-"));
+		tmpdirs.push(tmp);
 		const credsPath = join(tmp, "credentials.json");
 		await writeFile(credsPath, creds, { mode: 0o600 });
 		mounts.push("-v", `${credsPath}:/host-claude/.credentials.json:ro`);
@@ -95,21 +99,34 @@ export async function cmdRun(args: string[]) {
 		}
 	}
 
-	// --- Claude config: skills (merged with bundled ralph skill), plugins, root CLAUDE.md ---
+	// --- Skills: merged bundled + host, mounted for both Claude and Codex ---
 	// Build a merged skills temp dir so we don't nest a file mount inside a
 	// read-only directory mount (which causes "read-only file system" from runc).
 	const skillsTmpDir = await mkdtemp(join(tmpdir(), "yolomode-skills-"));
+	tmpdirs.push(skillsTmpDir);
 	await writeBundledSkills(skillsTmpDir);
-	const claudeSkills = join(HOME, ".claude", "skills");
-	if (await dirExists(claudeSkills)) {
-		// Host skills copied on top — host always wins over bundled
-		await $`cp -r ${claudeSkills}/. ${skillsTmpDir}/`.quiet();
+	// Check all host skill locations in priority order (later wins over earlier)
+	const hostSkillPaths = [
+		join(HOME, ".claude", "skills"), // ~/.claude/skills/
+		join(HOME, ".agents", "skills"), // ~/.agents/skills/
+	];
+	for (const p of hostSkillPaths) {
+		if (await dirExists(p)) {
+			await $`cp -r ${p}/. ${skillsTmpDir}/`.quiet();
+		}
 	}
+	// Mount for Claude (~/.claude/skills/) and Codex (~/.agents/skills/)
 	mounts.push("-v", `${skillsTmpDir}:/home/yolo/.claude/skills:ro`);
+	mounts.push("-v", `${skillsTmpDir}:/home/yolo/.agents/skills:ro`);
 
 	const claudePlugins = join(HOME, ".claude", "plugins");
 	if (await dirExists(claudePlugins)) {
-		mounts.push("-v", `${claudePlugins}:/home/yolo/.claude/plugins:ro`);
+		// Copy into a writable tmpdir — the plugin system writes back to
+		// marketplaces/ to cache its GitHub index, so a :ro mount breaks it.
+		const pluginsTmpDir = await mkdtemp(join(tmpdir(), "yolomode-plugins-"));
+		tmpdirs.push(pluginsTmpDir);
+		await $`cp -r ${claudePlugins}/. ${pluginsTmpDir}/`.quiet();
+		mounts.push("-v", `${pluginsTmpDir}:/home/yolo/.claude/plugins`);
 	}
 
 	const claudeRootMd = join(HOME, ".claude", "CLAUDE.md");
@@ -145,18 +162,9 @@ export async function cmdRun(args: string[]) {
 		.text()
 		.then((s) => s.trim());
 
-	// --- Optional host config ---
-	const starshipCfg = join(
-		process.env.XDG_CONFIG_HOME || join(HOME, ".config"),
-		"starship.toml",
-	);
-	if (await Bun.file(starshipCfg).exists()) {
-		mounts.push("-v", `${starshipCfg}:/home/yolo/.config/starship.toml:ro`);
-	}
-
-	// Named volume for /work — survives container kills and removes
+	// Named volume for the work dir — survives container kills and removes
 	await $`docker volume create ${name}`.quiet();
-	await $`docker run --rm -v ${name}:/work alpine chown 1000:1000 /work`.quiet();
+	await $`docker run --rm -v ${name}:${workDir} alpine sh -c ${"mkdir -p " + workDir + " && chown 1000:1000 " + workDir}`.quiet();
 
 	spinner.succeed(`Session ${pc.cyan(pc.bold(name))} ready`);
 	console.log();
@@ -172,8 +180,14 @@ export async function cmdRun(args: string[]) {
 		name,
 		"--label",
 		`yolomode.src=${process.cwd()}`,
+		"--label",
+		`yolomode.workdir=${workDir}`,
+		"--label",
+		`yolomode.tmpdirs=${tmpdirs.join("|")}`,
+		"--hostname",
+		name,
 		"-v",
-		`${name}:/work`,
+		`${name}:${workDir}`,
 		"-v",
 		`${process.cwd()}:/src:ro`,
 		...mounts,
@@ -181,6 +195,8 @@ export async function cmdRun(args: string[]) {
 		"ANTHROPIC_API_KEY",
 		"-e",
 		"OPENAI_API_KEY",
+		"-e",
+		`PROJECT_DIR=${workDir}`,
 		"-e",
 		"TERM",
 		"-e",
@@ -210,7 +226,7 @@ export async function cmdRun(args: string[]) {
 		"--shm-size",
 		"1g",
 		"--tmpfs",
-		"/tmp:nosuid,size=2g",
+		"/tmp:nosuid,exec,size=2g",
 		"--memory",
 		memLimit,
 		IMAGE,
@@ -230,11 +246,11 @@ export async function cmdRun(args: string[]) {
 			"-e",
 			`LINES=${rows}`,
 			"-w",
-			"/work",
+			workDir,
 			name,
 			"sh",
 			"-c",
-			`stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`,
+			`stty cols ${cols} rows ${rows} 2>/dev/null; exec nu`,
 		],
 		{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
 	).exited;

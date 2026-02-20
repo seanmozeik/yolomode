@@ -1,7 +1,7 @@
 import { $ } from "bun";
 import pc from "picocolors";
 import { IMAGE } from "./constants";
-import { die, warn, getFlags, ensureRunning } from "./utils";
+import { die, warn, getFlags, ensureRunning, getWorkDir } from "./utils";
 
 import RALPH_SH from "../ralph.sh" with { type: "text" };
 export { RALPH_SH };
@@ -33,6 +33,7 @@ export async function cmdRalph(args: string[]) {
 		die("--max-iterations must be a positive number");
 
 	await ensureRunning(id);
+	const workDir = await getWorkDir(id);
 
 	const prompt =
 		'Read prd.json in the current directory. Find the highest-priority story with status "pending". Set its status to "in_progress" and save prd.json. Then implement the story fully: write the code, run any available tests, typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update prd.json to set the story status to "complete" and commit that change too. If ALL stories already have status "complete", output exactly <promise>COMPLETE</promise> and do nothing else.';
@@ -49,7 +50,7 @@ export async function cmdRalph(args: string[]) {
 				"docker",
 				"exec",
 				"-w",
-				"/work",
+				workDir,
 				id,
 				"claude",
 				"--dangerously-skip-permissions",

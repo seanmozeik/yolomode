@@ -31,6 +31,9 @@ RUN cargo-binstall --no-confirm just
 FROM cargo-base AS tool-xh
 RUN cargo-binstall --no-confirm xh
 
+FROM cargo-base AS tool-nu
+RUN cargo-binstall --no-confirm nu
+
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser \
@@ -82,7 +85,7 @@ RUN install_packages gpg curl ca-certificates \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor > /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 RUN install_packages \
-    git curl wget jq zsh bash \
+    git curl wget jq zsh bash micro \
     build-essential openssh-client openssl libssl-dev \
     pkg-config \
     libffi-dev \
@@ -125,6 +128,7 @@ COPY --from=tool-sd /root/.cargo/bin/sd /usr/local/bin/
 COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
 COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
 COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
+COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
 COPY --from=agent-browser-tools /opt/playwright /opt/playwright
 COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
@@ -135,7 +139,7 @@ COPY --from=mise-tools /opt/rustup /opt/rustup
 COPY --from=mise-tools /opt/cargo /opt/cargo
 
 # Create non-root user
-RUN groupadd -g 1000 yolo && useradd -u 1000 -g yolo -d /home/yolo -s /bin/zsh -m yolo
+RUN groupadd -g 1000 yolo && useradd -u 1000 -g yolo -d /home/yolo -s /usr/local/bin/nu -m yolo
 ENV HOME=/home/yolo
 ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
 
@@ -157,15 +161,34 @@ RUN printf '%s\n' \
     'alias co="codex --yolo"' \
     >> /home/yolo/.bashrc
 
+# Nu shell setup
+# Starship goes in vendor/autoload — nu sources everything there automatically
+RUN mkdir -p /home/yolo/.config/nushell \
+        /home/yolo/.local/share/nushell/vendor/autoload \
+    && starship init nu > /home/yolo/.local/share/nushell/vendor/autoload/starship.nu \
+    && printf '%s\n' \
+    '$env.config.show_banner = false' \
+    '$env.EDITOR = "micro"' \
+    '$env.VISUAL = "micro"' \
+    'alias cc = claude --dangerously-skip-permissions' \
+    'alias co = codex --full-auto' \
+    'alias .. = cd ..' \
+    >> /home/yolo/.config/nushell/config.nu \
+    && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
+
 # Make global bun dir writable for runtime package installs
 RUN chown -R yolo:yolo /usr/local/bun
 RUN mkdir -p /usr/local/share/npm-global && \
     chown -R yolo:yolo /usr/local/share
 # Prepare writable directories owned by yolo user
-RUN mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
-    /home/yolo/.cargo/bin /home/yolo/go/bin \
-    /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
-    /home/yolo/.local/bin \
+COPY starship.toml /home/yolo/.config/starship.toml
+RUN VERSION=$(ls /opt/claude/versions/) \
+    && mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
+       /home/yolo/.cargo/bin /home/yolo/go/bin \
+       /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
+       /home/yolo/.local/bin /home/yolo/.local/share/claude/versions \
+    && ln -s /opt/claude/versions/$VERSION /home/yolo/.local/share/claude/versions/$VERSION \
+    && ln -s /home/yolo/.local/share/claude/versions/$VERSION /home/yolo/.local/bin/claude \
     && chown -R yolo:yolo /home/yolo
 
 # Entrypoint
@@ -176,4 +199,4 @@ RUN chmod +x /usr/local/bin/ralph
 
 USER yolo
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["zsh"]
+CMD ["nu"]

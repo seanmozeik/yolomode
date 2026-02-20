@@ -92,6 +92,28 @@ export function parseLabel(
 	return "";
 }
 
+// ── Work directory ──────────────────────────────────────────────
+
+// Derive the in-container work dir from the host project path.
+// Placed under ~/  so the prompt shows ~/projectname.
+export function toWorkDir(src: string): string {
+	const name =
+		basename(src)
+			.toLowerCase()
+			.replace(/[^a-z0-9_-]/g, "-")
+			.replace(/^-+|-+$/g, "") || "project";
+	return `/home/yolo/${name}`;
+}
+
+// Read the work dir that was stamped on the container at creation time.
+export async function getWorkDir(id: string): Promise<string> {
+	return $`docker inspect --format ${'{{index .Config.Labels "yolomode.workdir"}}'} ${id}`
+		.quiet()
+		.nothrow()
+		.text()
+		.then((s) => s.trim() || "/home/yolo/project");
+}
+
 // ── Session naming ──────────────────────────────────────────────
 
 export function generateName(): string {
