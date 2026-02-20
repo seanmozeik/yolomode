@@ -131,6 +131,17 @@ export async function cmdRun(args: string[]) {
 		const pluginsTmpDir = await mkdtemp(join(tmpdir(), "yolomode-plugins-"));
 		tmpdirs.push(pluginsTmpDir);
 		await $`cp -r ${claudePlugins}/. ${pluginsTmpDir}/`.quiet();
+		// Rewrite host home paths in plugin JSON files (installLocation /
+		// installPath fields are hardcoded to the host's HOME).
+		for (const fname of ["known_marketplaces.json", "installed_plugins.json"]) {
+			const fpath = join(pluginsTmpDir, fname);
+			try {
+				const data = await readFile(fpath, "utf-8");
+				await writeFile(fpath, data.replaceAll(HOME, "/home/yolo"));
+			} catch {
+				/* file may not exist */
+			}
+		}
 		mounts.push("-v", `${pluginsTmpDir}:/home/yolo/.claude/plugins`);
 	}
 
