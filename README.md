@@ -199,10 +199,13 @@ yolomode completions fish ym | source
 
 Multiple aliases are supported: `yolomode completions zsh ym y`.
 
-For Nushell, pass the alias as an argument — it generates both `export alias` and duplicate `export extern` blocks so subcommand completions work:
+For Nushell, define the alias in `config.nu` yourself, then pass it when generating completions — it adds `export extern "ym <subcommand>"` blocks so tab completion works on the alias:
 
 ```nu
-# In config.nu or a sourced file
+# config.nu
+alias ym = yolomode
+
+# generate completions (run once, then source)
 yolomode completions nu ym | save -f ~/.config/nushell/yolomode.nu
 source ~/.config/nushell/yolomode.nu
 ```

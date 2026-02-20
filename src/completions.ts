@@ -172,12 +172,13 @@ def "nu complete yolomode shells" [] {
 }
 `;
 
-function nuExterns(cmd: string): string {
-	return `
-export extern "${cmd}" [
-    command?: string@"nu complete yolomode commands"
-]
-
+function nuExterns(cmd: string, includeTopLevel = true): string {
+	const topLevel = includeTopLevel
+		? `\nexport extern "${cmd}" [\n    command?: string@"nu complete yolomode commands"\n]\n`
+		: "";
+	return (
+		topLevel +
+		`
 export extern "${cmd} build" [
     --no-cache    # Force rebuild without cache
 ]
@@ -220,17 +221,59 @@ export extern "${cmd} completions" [
 ]
 
 export extern "${cmd} ls" []
+`
+	);
+}
+
+// For aliases, `extern` doesn't work because nushell requires the command to
+// be an actual binary on PATH. Instead we use `export alias` + `def` wrappers
+// for subcommands that need session-name completions. Everything else falls
+// through to the alias.
+function nuAliasDefs(cmd: string): string {
+	return `
+export alias ${cmd} = yolomode
+
+export def "${cmd} attach" [
+    name?: string@"nu complete yolomode sessions"
+    --import: string
+] {
+    yolomode attach ...(if $name != null { [$name] } else { [] }) ...(if $import != null { ["--import", $import] } else { [] })
+}
+
+export def "${cmd} diff" [
+    name: string@"nu complete yolomode sessions"
+] { yolomode diff $name }
+
+export def "${cmd} apply" [
+    name: string@"nu complete yolomode sessions"
+] { yolomode apply $name }
+
+export def "${cmd} sync" [
+    name: string@"nu complete yolomode sessions"
+] { yolomode sync $name }
+
+export def "${cmd} rm" [
+    name?: string@"nu complete yolomode sessions"
+    --all(-a)
+] {
+    if $all { yolomode rm --all } else { yolomode rm ...(if $name != null { [$name] } else { [] }) }
+}
+
+export def "${cmd} ralph" [
+    name?: string@"nu complete yolomode sessions"
+    --max-iterations: int
+] {
+    mut args = ["ralph"]
+    if $name != null { $args = ($args | append $name) }
+    if $max_iterations != null { $args = ($args | append ["--max-iterations", ($max_iterations | into string)]) }
+    yolomode ...$args
+}
 `;
 }
 
 function nushellWithAliases(aliases: string[]): string {
-	const aliasDefs = aliases
-		.map((a) => `export alias ${a} = yolomode\n`)
-		.join("");
-	const aliasExterns = aliases.map((a) => nuExterns(a)).join("");
-	return (
-		COMPLETION_NU_HELPERS + nuExterns("yolomode") + aliasDefs + aliasExterns
-	);
+	const aliasDefs = aliases.map((a) => nuAliasDefs(a)).join("");
+	return COMPLETION_NU_HELPERS + nuExterns("yolomode") + aliasDefs;
 }
 
 export async function cmdCompletions(args: string[]) {
