@@ -3,11 +3,8 @@ import pc from "picocolors";
 import { IMAGE } from "./constants";
 import { die, warn, getFlags, ensureRunning } from "./utils";
 
-// Text imports — re-exported so cmd-run.ts can mount the skill
-// and cli.ts (build) can write ralph.sh into the Docker context
-import RALPH_SKILL from "../ralph-skill.md" with { type: "text" };
 import RALPH_SH from "../ralph.sh" with { type: "text" };
-export { RALPH_SKILL, RALPH_SH };
+export { RALPH_SH };
 
 export async function cmdRalph(args: string[]) {
 	let id = args[1];

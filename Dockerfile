@@ -28,6 +28,9 @@ RUN cargo-binstall --no-confirm starship
 FROM cargo-base AS tool-just
 RUN cargo-binstall --no-confirm just
 
+FROM cargo-base AS tool-xh
+RUN cargo-binstall --no-confirm xh
+
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser \
@@ -35,10 +38,6 @@ ENV npm_config_prefix=/opt/agent-browser \
 RUN npm install -g agent-browser
 # Download Playwright's own Chromium — tested against the exact agent-browser/Playwright version
 RUN /opt/agent-browser/bin/agent-browser install
-# Install skill via skills CLI in CI mode (-y skips prompts, -g global to $HOME, -a targets claude-code)
-ENV HOME=/opt/skills-home
-RUN mkdir -p /opt/skills-home \
-    && npx --yes skills add vercel-labs/agent-browser --skill agent-browser -g -a claude-code -y
 
 # ---- Language runtimes via mise (each on its own layer for caching) ----
 FROM bitnami/minideb:bookworm AS mise-tools
@@ -57,13 +56,19 @@ RUN mise use -g rust
 RUN mise use -g uv@latest
 RUN mise use -g python@3.13
 
-# ---- Bun + Claude Code + Codex ----
+# ---- Claude Code (official native installer) ----
+FROM bitnami/minideb:bookworm AS claude-install
+RUN install_packages curl bash ca-certificates
+ENV HOME=/opt/claude-home
+RUN mkdir -p /opt/claude-home \
+    && curl -fsSL https://claude.ai/install.sh | bash
+
+# ---- Bun + Codex + dev tools ----
 FROM bitnami/minideb:bookworm AS bun-tools
 RUN install_packages curl bash ca-certificates unzip
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="$BUN_INSTALL/bin:$PATH"
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
-RUN bun install -g @anthropic-ai/claude-code
 RUN bun install -g @openai/codex
 RUN bun install -g @biomejs/biome typescript
 
@@ -119,9 +124,11 @@ COPY --from=tool-fd /root/.cargo/bin/fd /usr/local/bin/
 COPY --from=tool-sd /root/.cargo/bin/sd /usr/local/bin/
 COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
 COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
+COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
 COPY --from=agent-browser-tools /opt/playwright /opt/playwright
-COPY --from=agent-browser-tools /opt/skills-home/.claude/skills/agent-browser /home/yolo/.claude/skills/agent-browser
+COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
+RUN ln -s /opt/claude/versions/$(ls /opt/claude/versions/) /usr/local/bin/claude
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup

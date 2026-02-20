@@ -16,7 +16,7 @@ import {
 	resolveImports,
 	warn,
 } from "./utils";
-import { RALPH_SKILL } from "./cmd-ralph";
+import { writeBundledSkills } from "./bundled-skills";
 
 // ── Private helpers ─────────────────────────────────────────────
 
@@ -99,11 +99,12 @@ export async function cmdRun(args: string[]) {
 	// Build a merged skills temp dir so we don't nest a file mount inside a
 	// read-only directory mount (which causes "read-only file system" from runc).
 	const skillsTmpDir = await mkdtemp(join(tmpdir(), "yolomode-skills-"));
+	await writeBundledSkills(skillsTmpDir);
 	const claudeSkills = join(HOME, ".claude", "skills");
 	if (await dirExists(claudeSkills)) {
+		// Host skills copied on top — host always wins over bundled
 		await $`cp -r ${claudeSkills}/. ${skillsTmpDir}/`.quiet();
 	}
-	await writeFile(join(skillsTmpDir, "ralph.md"), RALPH_SKILL);
 	mounts.push("-v", `${skillsTmpDir}:/home/yolo/.claude/skills:ro`);
 
 	const claudePlugins = join(HOME, ".claude", "plugins");
