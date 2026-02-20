@@ -40,6 +40,9 @@ RUN cargo-binstall --no-confirm bat
 FROM cargo-base AS tool-delta
 RUN cargo-binstall --no-confirm git-delta
 
+FROM cargo-base AS tool-gitui
+RUN cargo-binstall --no-confirm gitui
+
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS node
 
@@ -138,6 +141,7 @@ COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
+COPY --from=tool-gitui /root/.cargo/bin/gitui /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
