@@ -1,12 +1,12 @@
 {
-	"compilerOptions": {
-		"strict": true,
-		"target": "ESNext",
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"noEmit": true,
-		"skipLibCheck": true,
-		"types": ["bun-types"]
-	},
-	"include": ["src", "text.d.ts"]
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ESNext",
+    "types": ["bun-types"]
+  },
+  "include": ["src", "text.d.ts"]
 }

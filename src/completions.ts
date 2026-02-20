@@ -1,7 +1,7 @@
-import { die } from "./utils";
+import { die } from './utils';
 
-const COMMANDS = "build run attach ls diff apply sync rm completions ralph";
-const SESSION_COMMANDS = "attach a diff apply sync rm ralph";
+const COMMANDS = 'build run attach ls diff apply sync rm completions ralph';
+const SESSION_COMMANDS = 'attach a diff apply sync rm ralph';
 
 const COMPLETION_BASH = `\
 _yolomode() {
@@ -10,27 +10,27 @@ _yolomode() {
     cur="\${COMP_WORDS[COMP_CWORD]}"
     prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-    if [[ \$COMP_CWORD -eq 1 ]]; then
-        COMPREPLY=( $(compgen -W "${COMMANDS}" -- "\$cur") )
+    if [[ $COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( $(compgen -W "${COMMANDS}" -- "$cur") )
         return
     fi
 
-    case "\$prev" in
-        ${SESSION_COMMANDS.split(" ").join("|")})
+    case "$prev" in
+        ${SESSION_COMMANDS.split(' ').join('|')})
             local sessions
             sessions=$(yolomode --complete sessions 2>/dev/null)
-            COMPREPLY=( $(compgen -W "\$sessions" -- "\$cur") )
+            COMPREPLY=( $(compgen -W "$sessions" -- "$cur") )
             ;;
         completions)
-            COMPREPLY=( $(compgen -W "bash zsh fish nu" -- "\$cur") )
+            COMPREPLY=( $(compgen -W "bash zsh fish nu" -- "$cur") )
             ;;
         run)
-            COMPREPLY=( $(compgen -W "--import --memory --no-cache" -- "\$cur") )
+            COMPREPLY=( $(compgen -W "--import --memory --no-cache" -- "$cur") )
             ;;
         ralph)
             local sessions
             sessions=$(yolomode --complete sessions 2>/dev/null)
-            COMPREPLY=( $(compgen -W "\$sessions --max-iterations" -- "\$cur") )
+            COMPREPLY=( $(compgen -W "$sessions --max-iterations" -- "$cur") )
             ;;
     esac
 }
@@ -38,11 +38,8 @@ complete -F _yolomode yolomode
 `;
 
 function bashWithAliases(aliases: string[]): string {
-	if (aliases.length === 0) return COMPLETION_BASH;
-	return (
-		COMPLETION_BASH +
-		aliases.map((a) => `complete -F _yolomode ${a}\n`).join("")
-	);
+  if (aliases.length === 0) return COMPLETION_BASH;
+  return COMPLETION_BASH + aliases.map((a) => `complete -F _yolomode ${a}\n`).join('');
 }
 
 const COMPLETION_ZSH = `\
@@ -65,7 +62,7 @@ _yolomode() {
         '1:command:->command' \\
         '*::arg:->args'
 
-    case \$state in
+    case $state in
         command)
             _describe 'command' commands
             ;;
@@ -73,7 +70,7 @@ _yolomode() {
             case \${words[1]} in
                 attach|a|diff|apply|sync|rm)
                     local -a sessions
-                    sessions=(\${(f)"\$(yolomode --complete sessions 2>/dev/null)"})
+                    sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
                     compadd -a sessions
                     ;;
                 completions)
@@ -87,7 +84,7 @@ _yolomode() {
                     ;;
                 ralph)
                     local -a sessions
-                    sessions=(\${(f)"\$(yolomode --complete sessions 2>/dev/null)"})
+                    sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
                     _arguments \\
                         '1:session:compadd -a sessions' \\
                         '--max-iterations[Max loop iterations]:count:'
@@ -100,10 +97,8 @@ compdef _yolomode yolomode
 `;
 
 function zshWithAliases(aliases: string[]): string {
-	if (aliases.length === 0) return COMPLETION_ZSH;
-	return (
-		COMPLETION_ZSH + aliases.map((a) => `compdef _yolomode ${a}\n`).join("")
-	);
+  if (aliases.length === 0) return COMPLETION_ZSH;
+  return COMPLETION_ZSH + aliases.map((a) => `compdef _yolomode ${a}\n`).join('');
 }
 
 const COMPLETION_FISH = `\
@@ -139,12 +134,12 @@ complete -c yolomode -n '__fish_seen_subcommand_from completions' -a 'bash zsh f
 `;
 
 function fishWithAliases(aliases: string[]): string {
-	if (aliases.length === 0) return COMPLETION_FISH;
-	// fish `--wraps` tells it to reuse all completions from the wrapped command
-	const wraps = aliases
-		.map((a) => `complete -c ${a} --wraps yolomode -d 'yolomode alias'\n`)
-		.join("");
-	return COMPLETION_FISH + wraps;
+  if (aliases.length === 0) return COMPLETION_FISH;
+  // fish `--wraps` tells it to reuse all completions from the wrapped command
+  const wraps = aliases
+    .map((a) => `complete -c ${a} --wraps yolomode -d 'yolomode alias'\n`)
+    .join('');
+  return COMPLETION_FISH + wraps;
 }
 
 const COMPLETION_NU_HELPERS = `\
@@ -173,12 +168,12 @@ def "nu complete yolomode shells" [] {
 `;
 
 function nuExterns(cmd: string, includeTopLevel = true): string {
-	const topLevel = includeTopLevel
-		? `\nexport extern "${cmd}" [\n    command?: string@"nu complete yolomode commands"\n]\n`
-		: "";
-	return (
-		topLevel +
-		`
+  const topLevel = includeTopLevel
+    ? `\nexport extern "${cmd}" [\n    command?: string@"nu complete yolomode commands"\n]\n`
+    : '';
+  return (
+    topLevel +
+    `
 export extern "${cmd} build" [
     --no-cache    # Force rebuild without cache
 ]
@@ -222,7 +217,7 @@ export extern "${cmd} completions" [
 
 export extern "${cmd} ls" []
 `
-	);
+  );
 }
 
 // For aliases, `extern` doesn't work because nushell requires the command to
@@ -230,7 +225,7 @@ export extern "${cmd} ls" []
 // for subcommands that need session-name completions. Everything else falls
 // through to the alias.
 function nuAliasDefs(cmd: string): string {
-	return `
+  return `
 export alias ${cmd} = yolomode
 
 export def "${cmd} attach" [
@@ -272,31 +267,31 @@ export def "${cmd} ralph" [
 }
 
 function nushellWithAliases(aliases: string[]): string {
-	const aliasDefs = aliases.map((a) => nuAliasDefs(a)).join("");
-	return COMPLETION_NU_HELPERS + nuExterns("yolomode") + aliasDefs;
+  const aliasDefs = aliases.map((a) => nuAliasDefs(a)).join('');
+  return COMPLETION_NU_HELPERS + nuExterns('yolomode') + aliasDefs;
 }
 
-export async function cmdCompletions(args: string[]) {
-	const shell = args[1];
-	if (!shell) die("usage: yolomode completions <bash|zsh|fish|nu> [alias...]");
+export async function cmdCompletions(args: string[]): Promise<void> {
+  const shell = args[1];
+  if (!shell) die('usage: yolomode completions <bash|zsh|fish|nu> [alias...]');
 
-	const aliases = args.slice(2).filter((a) => !a.startsWith("-"));
+  const aliases = args.slice(2).filter((a) => !a.startsWith('-'));
 
-	switch (shell) {
-		case "bash":
-			process.stdout.write(bashWithAliases(aliases));
-			break;
-		case "zsh":
-			process.stdout.write(zshWithAliases(aliases));
-			break;
-		case "fish":
-			process.stdout.write(fishWithAliases(aliases));
-			break;
-		case "nu":
-		case "nushell":
-			process.stdout.write(nushellWithAliases(aliases));
-			break;
-		default:
-			die(`unsupported shell: ${shell} (supported: bash, zsh, fish, nu)`);
-	}
+  switch (shell) {
+    case 'bash':
+      process.stdout.write(bashWithAliases(aliases));
+      break;
+    case 'zsh':
+      process.stdout.write(zshWithAliases(aliases));
+      break;
+    case 'fish':
+      process.stdout.write(fishWithAliases(aliases));
+      break;
+    case 'nu':
+    case 'nushell':
+      process.stdout.write(nushellWithAliases(aliases));
+      break;
+    default:
+      die(`unsupported shell: ${shell} (supported: bash, zsh, fish, nu)`);
+  }
 }

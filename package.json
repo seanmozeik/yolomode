@@ -1,16 +1,26 @@
 {
-  "name": "yolomode",
-  "version": "0.1.0",
-  "description": "Claude Code skill manager and agent runner",
-  "type": "module",
   "bin": {
     "yolomode": "src/cli.ts"
+  },
+  "dependencies": {
+    "boxen": "^8.0.1",
+    "console-table-printer": "^2.15.0",
+    "gradient-string": "^3.0.0",
+    "ora": "^9.3.0",
+    "picocolors": "^1.1.1"
+  },
+  "description": "Claude Code skill manager and agent runner",
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.3",
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.9.3"
   },
   "files": [
     "src",
     "package.json"
   ],
   "license": "MIT",
+  "name": "yolomode",
   "publishConfig": {
     "access": "public"
   },
@@ -26,16 +36,6 @@
     "format": "biome format --write .",
     "tc": "tsc --noEmit"
   },
-  "devDependencies": {
-    "@biomejs/biome": "^2.4.3",
-    "@types/bun": "^1.3.9",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
-    "boxen": "^8.0.1",
-    "console-table-printer": "^2.15.0",
-    "gradient-string": "^3.0.0",
-    "ora": "^9.3.0",
-    "picocolors": "^1.1.1"
-  }
+  "type": "module",
+  "version": "0.1.0"
 }
