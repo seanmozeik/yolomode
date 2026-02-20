@@ -9,6 +9,7 @@ import { writeBundledSkills } from './bundled-skills';
 import { HOME, IMAGE } from './constants';
 import {
   copyImports,
+  die,
   dirExists,
   execShell,
   generateUniqueName,
@@ -64,6 +65,34 @@ async function checkDockerMemory(): Promise<void> {
   }
 }
 
+function parsePortPublishArg(value: string): { host: number; container: number } {
+  const v = value.trim();
+  const parts = v.split(':');
+  if (parts.length === 1) {
+    const port = Number(parts[0]);
+    if (!Number.isInteger(port) || port < 1 || port > 65535) {
+      die(`invalid --port value "${value}" (expected 1-65535 or HOST:CONTAINER)`);
+    }
+    return { container: port, host: port };
+  }
+  if (parts.length === 2) {
+    const host = Number(parts[0]);
+    const container = Number(parts[1]);
+    if (
+      !Number.isInteger(host) ||
+      host < 1 ||
+      host > 65535 ||
+      !Number.isInteger(container) ||
+      container < 1 ||
+      container > 65535
+    ) {
+      die(`invalid --port value "${value}" (expected 1-65535 or HOST:CONTAINER)`);
+    }
+    return { container, host };
+  }
+  die(`invalid --port value "${value}" (expected 1-65535 or HOST:CONTAINER)`);
+}
+
 // ── Command handler ─────────────────────────────────────────────
 
 export async function cmdRun(args: string[]): Promise<void> {
@@ -77,6 +106,7 @@ export async function cmdRun(args: string[]): Promise<void> {
 
   const memoryFlags = getFlags(args, '--memory');
   const memLimit = memoryFlags.at(-1) ?? '16g';
+  const portMappings = getFlags(args, '--port').map(parsePortPublishArg);
 
   await checkDockerMemory();
   const spinner = ora('Preparing session...').start();
@@ -169,6 +199,14 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (await Bun.file(codexAuth).exists()) {
     mounts.push('-v', `${codexAuth}:/host-codex/auth.json:ro`);
   }
+  const yolomodeCodexConfig = join(
+    process.env.XDG_CONFIG_HOME || join(HOME, '.config'),
+    'yolomode',
+    'config.toml'
+  );
+  if (await Bun.file(yolomodeCodexConfig).exists()) {
+    mounts.push('-v', `${yolomodeCodexConfig}:/host-codex/config.toml:ro`);
+  }
 
   // --- Host git identity ---
   const gitName = await $`git config --global user.name`
@@ -235,6 +273,7 @@ export async function cmdRun(args: string[]): Promise<void> {
     '1g',
     '--tmpfs',
     '/tmp:nosuid,exec,size=2g',
+    ...portMappings.flatMap(({ host, container }) => ['-p', `127.0.0.1:${host}:${container}`]),
     '--memory',
     memLimit,
     IMAGE
@@ -254,6 +293,10 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (imports.length > 0) {
     const list = imports.map((i) => i.base).join(', ');
     nextStepLines.push(`${pc.cyan(pc.bold('imports'))}  /tmp/imports/  ${pc.dim(`(${list})`)}`);
+  }
+  if (portMappings.length > 0) {
+    const list = portMappings.map(({ host, container }) => `${host}:${container}`).join(', ');
+    nextStepLines.push(`${pc.cyan(pc.bold('ports'))}    localhost  ${pc.dim(`(${list})`)}`);
   }
   console.log(
     boxen(nextStepLines.join('\n'), {

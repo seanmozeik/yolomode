@@ -42,7 +42,7 @@ From there, install deps, poke around, and launch whichever agent you want:
 
 ```
 claude --dangerously-skip-permissions
-codex --full-auto
+codex --yolo
 ```
 
 #### Import files into a session
@@ -52,6 +52,33 @@ Pass one or more `--import` flags to copy host files or directories into `/tmp/i
 ```
 yolomode run --import ~/Downloads/research.md --import ~/Downloads/data/
 ```
+
+#### Publish dev server ports to host
+
+Pass one or more `--port` flags on `run` to make container services reachable at `localhost` on the host:
+
+```bash
+# same host/container port
+yolomode run --port 3000 --port 5173
+
+# custom host -> container mapping
+yolomode run --port 8080:3000
+```
+
+`--port` accepts either `CONTAINER_PORT` or `HOST_PORT:CONTAINER_PORT`, and binds to `127.0.0.1` only.
+
+For already-running sessions, use `forward`:
+
+```bash
+# if exactly one running session
+yolomode forward 3000
+
+# pick a specific session
+yolomode forward swift-fox 3000
+yolomode forward swift-fox 8080:3000
+```
+
+If the requested localhost port is busy, yolomode picks the next available port automatically.
 
 ### Reattach to a session
 
@@ -216,6 +243,10 @@ source ~/.config/nushell/yolomode.nu
 
 Place a `settings.json` at `~/.config/yolomode/settings.json` (or `$XDG_CONFIG_HOME/yolomode/settings.json`) to inject Claude Code settings into every session. This file is copied into the container as `~/.claude/settings.json`.
 
+### Codex settings
+
+Place a `config.toml` at `~/.config/yolomode/config.toml` (or `$XDG_CONFIG_HOME/yolomode/config.toml`) to inject Codex settings into every session. This file is copied into the container as `~/.codex/config.toml`.
+
 ### What gets mounted
 
 | Host path | Container path | Notes |
@@ -224,6 +255,7 @@ Place a `settings.json` at `~/.config/yolomode/settings.json` (or `$XDG_CONFIG_H
 | `~/.claude/plugins/` | `~/.claude/plugins/` | Read-only |
 | `~/.claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Read-only |
 | `~/.config/yolomode/settings.json` | `~/.claude/settings.json` | Copied by entrypoint |
+| `~/.config/yolomode/config.toml` | `~/.codex/config.toml` | Copied by entrypoint |
 | `~/.config/starship.toml` | `~/.config/starship.toml` | Read-only |
 | `~/.claude.json` | `~/.claude.json` | Preprocessed (installMethod stripped) |
 

@@ -12,6 +12,7 @@ import STARSHIP from '../config/starship.toml' with { type: 'text' };
 import DOCKERFILE from '../Dockerfile' with { type: 'text' };
 import ENTRYPOINT from '../entrypoint.sh' with { type: 'text' };
 import { cmdApply } from './cmd-apply';
+import { cmdForward } from './cmd-forward';
 import { cmdRalph, RALPH_SH } from './cmd-ralph';
 import { cmdRun } from './cmd-run';
 import { cmdCompletions } from './completions';
@@ -105,6 +106,11 @@ try {
 
     case 'run': {
       await cmdRun(args);
+      break;
+    }
+
+    case 'forward': {
+      await cmdForward(args);
       break;
     }
 
@@ -289,7 +295,14 @@ try {
       console.log();
       const cmds = [
         ['build', 'Build the Docker image  (--no-cache, -v/--verbose for live output)'],
-        ['run', 'Start a new isolated session  (--import <path> to copy files in)'],
+        [
+          'run',
+          'Start a new isolated session  (--import <path>, --port <container|host:container>)'
+        ],
+        [
+          'forward [name] <port>',
+          'Forward from running session to localhost  (<container|host:container>)'
+        ],
         ['attach <name>', 'Open a new shell in a session (alias: a)  (--import <path>)'],
         ['ls', 'List all sessions'],
         ['diff <name>', 'Show changes from a session as a patch'],
@@ -300,7 +313,7 @@ try {
         ['ralph <name>', 'Run ralph autonomous loop (--max-iterations N)']
       ];
       for (const [cmd, desc] of cmds) {
-        console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(20)))}${pc.dim(desc)}`);
+        console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(24)))}${pc.dim(desc)}`);
       }
       console.log();
       if (command) die(`unknown command: ${command}`);

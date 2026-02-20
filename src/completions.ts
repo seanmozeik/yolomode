@@ -1,7 +1,7 @@
 import { die } from './utils';
 
-const COMMANDS = 'build run attach ls diff apply sync rm completions ralph';
-const SESSION_COMMANDS = 'attach a diff apply sync rm ralph';
+const COMMANDS = 'build run forward attach ls diff apply sync rm completions ralph';
+const SESSION_COMMANDS = 'forward attach a diff apply sync rm ralph';
 
 const COMPLETION_BASH = `\
 _yolomode() {
@@ -25,7 +25,7 @@ _yolomode() {
             COMPREPLY=( $(compgen -W "bash zsh fish nu" -- "$cur") )
             ;;
         run)
-            COMPREPLY=( $(compgen -W "--import --memory --no-cache" -- "$cur") )
+            COMPREPLY=( $(compgen -W "--import --memory --port --no-cache" -- "$cur") )
             ;;
         ralph)
             local sessions
@@ -48,6 +48,7 @@ _yolomode() {
     commands=(
         'build:Build the Docker image'
         'run:Start a new isolated session'
+        'forward:Forward container port to localhost'
         'attach:Open a shell in a session'
         'ls:List all sessions'
         'diff:Show changes from a session'
@@ -80,6 +81,7 @@ _yolomode() {
                     _arguments \\
                         '--import[Copy file/dir into session]:path:_files' \\
                         '--memory[Memory limit]:limit:' \\
+                        '--port[Publish port (CONTAINER or HOST:CONTAINER)]:port:' \\
                         '--no-cache[Force rebuild without cache]'
                     ;;
                 ralph)
@@ -108,6 +110,7 @@ complete -c yolomode -f
 # Subcommands (only when no subcommand given yet)
 complete -c yolomode -n '__fish_use_subcommand' -a build -d 'Build the Docker image'
 complete -c yolomode -n '__fish_use_subcommand' -a run -d 'Start a new isolated session'
+complete -c yolomode -n '__fish_use_subcommand' -a forward -d 'Forward container port to localhost'
 complete -c yolomode -n '__fish_use_subcommand' -a attach -d 'Open a shell in a session'
 complete -c yolomode -n '__fish_use_subcommand' -a ls -d 'List all sessions'
 complete -c yolomode -n '__fish_use_subcommand' -a diff -d 'Show changes from a session'
@@ -118,7 +121,7 @@ complete -c yolomode -n '__fish_use_subcommand' -a completions -d 'Print shell c
 complete -c yolomode -n '__fish_use_subcommand' -a ralph -d 'Run the ralph autonomous loop'
 
 # Session name completions
-complete -c yolomode -n '__fish_seen_subcommand_from attach diff apply sync rm' -a '(yolomode --complete sessions 2>/dev/null)' -f
+complete -c yolomode -n '__fish_seen_subcommand_from forward attach diff apply sync rm' -a '(yolomode --complete sessions 2>/dev/null)' -f
 
 # ralph: session names + flags
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a '(yolomode --complete sessions 2>/dev/null)' -f
@@ -127,6 +130,7 @@ complete -c yolomode -n '__fish_seen_subcommand_from ralph' -l max-iterations -d
 # run flags
 complete -c yolomode -n '__fish_seen_subcommand_from run' -l import -d 'Copy file/dir into session' -r
 complete -c yolomode -n '__fish_seen_subcommand_from run' -l memory -d 'Memory limit' -r
+complete -c yolomode -n '__fish_seen_subcommand_from run' -l port -d 'Publish port (CONTAINER or HOST:CONTAINER)' -r
 complete -c yolomode -n '__fish_seen_subcommand_from run' -l no-cache -d 'Force rebuild without cache'
 
 # completions: shell names
@@ -147,6 +151,7 @@ def "nu complete yolomode commands" [] {
     [
         { value: "build", description: "Build the Docker image" }
         { value: "run", description: "Start a new isolated session" }
+        { value: "forward", description: "Forward container port to localhost" }
         { value: "attach", description: "Open a shell in a session" }
         { value: "ls", description: "List all sessions" }
         { value: "diff", description: "Show changes from a session" }
@@ -181,7 +186,14 @@ export extern "${cmd} build" [
 export extern "${cmd} run" [
     --import: string    # Copy file/dir into session
     --memory: string    # Memory limit (default: 16g)
+    --port: string      # Publish port (CONTAINER or HOST:CONTAINER)
     --no-cache          # Force rebuild without cache
+]
+
+export extern "${cmd} forward" [
+    name?: string@"nu complete yolomode sessions"
+    port: string
+    --host-port: int
 ]
 
 export extern "${cmd} attach" [
@@ -233,6 +245,18 @@ export def "${cmd} attach" [
     --import: string
 ] {
     yolomode attach ...(if $name != null { [$name] } else { [] }) ...(if $import != null { ["--import", $import] } else { [] })
+}
+
+export def "${cmd} forward" [
+    name?: string@"nu complete yolomode sessions"
+    port: string
+    --host-port: int
+] {
+    mut args = ["forward"]
+    if $name != null { $args = ($args | append $name) }
+    $args = ($args | append $port)
+    if $host_port != null { $args = ($args | append ["--host-port", ($host_port | into string)]) }
+    yolomode ...$args
 }
 
 export def "${cmd} diff" [

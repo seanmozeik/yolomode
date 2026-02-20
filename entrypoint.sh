@@ -25,6 +25,10 @@ if [ -f /host-codex/auth.json ]; then
   mkdir -p "$HOME/.codex"
   cp /host-codex/auth.json "$HOME/.codex/auth.json"
 fi
+if [ -f /host-codex/config.toml ]; then
+  mkdir -p "$HOME/.codex"
+  cp /host-codex/config.toml "$HOME/.codex/config.toml"
+fi
 
 # Propagate host git identity into container's global config
 if [ -n "$GIT_AUTHOR_NAME" ]; then
@@ -33,6 +37,9 @@ fi
 if [ -n "$GIT_AUTHOR_EMAIL" ]; then
   git config --global user.email "$GIT_AUTHOR_EMAIL"
 fi
+# Avoid SSH host trust prompts in containers by preferring HTTPS for GitHub remotes.
+git config --global --replace-all url."https://github.com/".insteadOf "git@github.com:"
+git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
 
 # On first start, copy source into writable work dir (respecting .gitignore)
 WORKDIR="${PROJECT_DIR:-/home/yolo/project}"

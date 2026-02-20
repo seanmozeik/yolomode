@@ -9,6 +9,7 @@ class Yolomode < Formula
   sha256 "0000000000000000000000000000000000000000000000000000000000000000"
 
   depends_on "oven-sh/bun/bun"
+  depends_on "socat"
 
   on_linux do
     depends_on "libsecret"
