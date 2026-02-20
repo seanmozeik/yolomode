@@ -137,7 +137,16 @@ export async function cmdRun(args: string[]) {
 			const fpath = join(pluginsTmpDir, fname);
 			try {
 				const data = await readFile(fpath, "utf-8");
-				await writeFile(fpath, data.replaceAll(HOME, "/home/yolo"));
+				// Replace both the correct form (HOME + "/.claude") and the buggy form
+				// (HOME + ".claude", missing the separator) that Claude Code sometimes writes.
+				// Using join(HOME, ".claude") normalises any trailing slash in HOME so we
+				// never accidentally eat the "/" that separates the home dir from ".claude".
+				const correctClaudeDir = join(HOME, ".claude"); // e.g. /Users/sean/.claude
+				const buggyClaudeDir = HOME.replace(/\/$/, "") + ".claude"; // e.g. /Users/sean.claude
+				const fixed = data
+					.replaceAll(correctClaudeDir, "/home/yolo/.claude")
+					.replaceAll(buggyClaudeDir, "/home/yolo/.claude");
+				await writeFile(fpath, fixed);
 			} catch {
 				/* file may not exist */
 			}

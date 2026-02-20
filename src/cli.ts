@@ -213,7 +213,7 @@ try {
 		}
 
 		case "diff": {
-			const id = await resolveSession(args[1]);
+			const id = await resolveSession(args[1], { all: true });
 			await ensureRunning(id);
 			const workDir = await getWorkDir(id);
 			await $`docker exec ${id} git -C ${workDir} add -A`.quiet();

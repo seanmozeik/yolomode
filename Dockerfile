@@ -34,6 +34,9 @@ RUN cargo-binstall --no-confirm xh
 FROM cargo-base AS tool-nu
 RUN cargo-binstall --no-confirm nu
 
+FROM cargo-base AS tool-bat
+RUN cargo-binstall --no-confirm bat
+
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser \
@@ -129,6 +132,7 @@ COPY --from=tool-starship /root/.cargo/bin/starship /usr/local/bin/
 COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
 COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
+COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
 COPY --from=agent-browser-tools /opt/playwright /opt/playwright
 COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude

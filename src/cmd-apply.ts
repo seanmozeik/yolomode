@@ -15,7 +15,7 @@ import {
 } from "./utils";
 
 export async function cmdApply(args: string[]) {
-	const id = await resolveSession(args[1]);
+	const id = await resolveSession(args[1], { all: true });
 
 	// Warn if applying from a different directory than where the session was created
 	const srcLabel =
