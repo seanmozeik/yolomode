@@ -1,7 +1,7 @@
 import { die } from './utils';
 
 const COMMANDS = 'build run forward attach ls diff apply sync rm completions ralph';
-const SESSION_COMMANDS = 'forward attach a diff apply sync rm ralph';
+const SESSION_COMMANDS = 'forward attach a diff apply sync rm';
 
 const COMPLETION_BASH = `\
 _yolomode() {
@@ -28,9 +28,14 @@ _yolomode() {
             COMPREPLY=( $(compgen -W "--import --memory --port --no-cache" -- "$cur") )
             ;;
         ralph)
-            local sessions
-            sessions=$(yolomode --complete sessions 2>/dev/null)
-            COMPREPLY=( $(compgen -W "$sessions --max-iterations" -- "$cur") )
+            COMPREPLY=( $(compgen -W "claude codex" -- "$cur") )
+            ;;
+        claude|codex)
+            if [[ "\${COMP_WORDS[1]}" == "ralph" ]]; then
+                local sessions
+                sessions=$(yolomode --complete sessions 2>/dev/null)
+                COMPREPLY=( $(compgen -W "$sessions --max-iterations --" -- "$cur") )
+            fi
             ;;
     esac
 }
@@ -88,7 +93,8 @@ _yolomode() {
                     local -a sessions
                     sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
                     _arguments \\
-                        '1:session:compadd -a sessions' \\
+                        '1:agent:(claude codex)' \\
+                        '2:session:compadd -a sessions' \\
                         '--max-iterations[Max loop iterations]:count:'
                     ;;
             esac
@@ -123,7 +129,8 @@ complete -c yolomode -n '__fish_use_subcommand' -a ralph -d 'Run the ralph auton
 # Session name completions
 complete -c yolomode -n '__fish_seen_subcommand_from forward attach diff apply sync rm' -a '(yolomode --complete sessions 2>/dev/null)' -f
 
-# ralph: session names + flags
+# ralph: agent, session names, flags
+complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a 'claude codex' -f
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a '(yolomode --complete sessions 2>/dev/null)' -f
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -l max-iterations -d 'Max loop iterations'
 
@@ -169,6 +176,10 @@ def "nu complete yolomode sessions" [] {
 
 def "nu complete yolomode shells" [] {
     ["bash" "zsh" "fish" "nu"]
+}
+
+def "nu complete yolomode agents" [] {
+    ["claude" "codex"]
 }
 `;
 
@@ -219,7 +230,8 @@ export extern "${cmd} rm" [
 ]
 
 export extern "${cmd} ralph" [
-    name: string@"nu complete yolomode sessions"
+    agent: string@"nu complete yolomode agents"
+    name?: string@"nu complete yolomode sessions"
     --max-iterations: int    # Max loop iterations (default: 10)
 ]
 
@@ -279,10 +291,12 @@ export def "${cmd} rm" [
 }
 
 export def "${cmd} ralph" [
+    agent: string@"nu complete yolomode agents"
     name?: string@"nu complete yolomode sessions"
     --max-iterations: int
 ] {
     mut args = ["ralph"]
+    $args = ($args | append $agent)
     if $name != null { $args = ($args | append $name) }
     if $max_iterations != null { $args = ($args | append ["--max-iterations", ($max_iterations | into string)]) }
     yolomode ...$args

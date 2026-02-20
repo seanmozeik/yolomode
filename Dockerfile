@@ -165,13 +165,13 @@ RUN printf '%s\n' \
     '_ym_title() { printf "\033]0;ym-%s\007" "$HOST"; }' \
     'precmd_functions+=(_ym_title)' \
     'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --yolo"' \
+    'alias co="codex --dangerously-bypass-approvals-and-sandbox"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
     'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --yolo"' \
+    'alias co="codex --dangerously-bypass-approvals-and-sandbox"' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -184,7 +184,7 @@ RUN mkdir -p /home/yolo/.config/nushell \
     '$env.EDITOR = "micro"' \
     '$env.VISUAL = "micro"' \
     'alias cc = claude --dangerously-skip-permissions' \
-    'alias co = codex --yolo' \
+    'alias co = codex --dangerously-bypass-approvals-and-sandbox' \
     'alias .. = cd ..' \
     >> /home/yolo/.config/nushell/config.nu \
     && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell

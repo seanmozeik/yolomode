@@ -42,7 +42,7 @@ From there, install deps, poke around, and launch whichever agent you want:
 
 ```
 claude --dangerously-skip-permissions
-codex --yolo
+codex --dangerously-bypass-approvals-and-sandbox
 ```
 
 #### Import files into a session
@@ -141,24 +141,26 @@ Builds from scratch, no cache. Use after bumping tool versions or modifying the 
 
 ## Ralph: Autonomous PRD Loop
 
-Ralph is an autonomous implementation loop built into yolomode. It repeatedly runs Claude Code against a `prd.json` file, picking the highest-priority incomplete story each iteration, implementing it, running quality checks, committing, and marking it done. The loop exits when all stories are complete.
+Ralph is an autonomous implementation loop built into yolomode. It repeatedly runs Claude Code or Codex against a `prd.json` file, picking the highest-priority incomplete story each iteration, implementing it, running quality checks, committing, and marking it done. The loop exits when all stories are complete.
 
 ### Running from the host
 
 ```
-yolomode ralph swift-fox
-yolomode ralph swift-fox --max-iterations 20
+yolomode ralph claude swift-fox
+yolomode ralph codex swift-fox --max-iterations 20
+yolomode ralph codex --max-iterations 20 -- --model gpt-5-codex
 ```
 
-This runs the loop from your host machine, targeting a named container. Output streams in real time. Defaults to 10 iterations. If only one session is running, the name is optional.
+This runs the loop from your host machine, targeting a named container. Output streams in real time. Defaults to 10 iterations. If only one session is running, the name is optional. Agent-specific flags can be passed after `--`.
 
 ### Running inside a container
 
 The `ralph` command is also available on PATH inside every container:
 
 ```
-ralph           # default 10 iterations
-ralph 20        # custom max iterations
+ralph claude            # default 10 iterations
+ralph codex 20          # custom max iterations
+ralph codex -- --model gpt-5-codex
 ```
 
 ### PRD format
