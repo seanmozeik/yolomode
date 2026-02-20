@@ -3,7 +3,7 @@ import net from 'node:net';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import pc from 'picocolors';
-import { HOME } from './constants';
+import { FORWARDS_DIR } from './constants';
 import { die, ensureRunning, getFlags, resolveSession } from './utils';
 
 function parsePortSpec(value: string): { host?: number; container: number } {
@@ -102,10 +102,9 @@ export async function cmdForward(args: string[]): Promise<void> {
     die('failed to start port forward');
   }
 
-  const forwardsDir = join(HOME, '.yolomode', 'forwards');
-  await mkdir(forwardsDir, { recursive: true });
+  await mkdir(FORWARDS_DIR, { recursive: true });
   await writeFile(
-    join(forwardsDir, `${id}-${hostPort}.json`),
+    join(FORWARDS_DIR, `${id}-${hostPort}.json`),
     JSON.stringify(
       {
         containerId: id,

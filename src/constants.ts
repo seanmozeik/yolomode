@@ -1,5 +1,9 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 export const IMAGE = 'yolomode';
 export const HOME = process.env.HOME ?? '';
+export const FORWARDS_DIR = join(tmpdir(), 'yolomode-forwards');
 
 export const BANNER = `             _                           _      
             | |                         | |     

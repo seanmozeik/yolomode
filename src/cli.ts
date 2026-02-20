@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import boxen from 'boxen';
@@ -16,7 +16,7 @@ import { cmdForward } from './cmd-forward';
 import { cmdRalph, RALPH_SH } from './cmd-ralph';
 import { cmdRun } from './cmd-run';
 import { cmdCompletions } from './completions';
-import { BANNER, HOME, IMAGE } from './constants';
+import { BANNER, FORWARDS_DIR, HOME, IMAGE } from './constants';
 import {
   copyImports,
   die,
@@ -39,6 +39,64 @@ async function cleanupTmpdirs(id: string): Promise<void> {
       .then((s) => s.trim());
   for (const dir of label.split('|').filter(Boolean)) {
     await rm(dir, { force: true, recursive: true });
+  }
+}
+
+function normalizeContainerRef(value: string): string {
+  return value.replace(/^\//, '').trim();
+}
+
+function looksLikeContainerId(value: string): boolean {
+  return /^[a-f0-9]{12,64}$/i.test(value);
+}
+
+function matchesContainerRef(containerRef: string, targets: Set<string>): boolean {
+  if (targets.has(containerRef)) return true;
+  if (!looksLikeContainerId(containerRef)) return false;
+  for (const target of targets) {
+    if (!looksLikeContainerId(target)) continue;
+    if (containerRef.startsWith(target) || target.startsWith(containerRef)) return true;
+  }
+  return false;
+}
+
+async function isSocatPid(pid: number): Promise<boolean> {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  const proc = await $`ps -p ${pid} -o comm=`.quiet().nothrow().text();
+  const cmd = proc.trim().split('/').pop() ?? '';
+  return cmd === 'socat';
+}
+
+async function cleanupForwards(containerRefs: string[]): Promise<void> {
+  const targets = new Set(containerRefs.map(normalizeContainerRef).filter(Boolean));
+  if (targets.size === 0) return;
+
+  let files: string[];
+  try {
+    files = await readdir(FORWARDS_DIR);
+  } catch {
+    return;
+  }
+
+  const killedPids = new Set<number>();
+  for (const file of files) {
+    if (!file.endsWith('.json')) continue;
+    const path = join(FORWARDS_DIR, file);
+    try {
+      const raw = await readFile(path, 'utf8');
+      const data = JSON.parse(raw) as { containerId?: string; pid?: number };
+      const containerId = normalizeContainerRef(String(data.containerId ?? ''));
+      if (!containerId || !matchesContainerRef(containerId, targets)) continue;
+
+      const pid = Number(data.pid);
+      if (!killedPids.has(pid) && (await isSocatPid(pid))) {
+        await $`kill ${pid}`.quiet().nothrow();
+        killedPids.add(pid);
+      }
+      await rm(path, { force: true });
+    } catch {
+      // Ignore malformed or stale forward records.
+    }
   }
 }
 
@@ -233,11 +291,14 @@ try {
             .text()
             .then((s) => s.trim());
           if (ids) {
-            for (const id of ids.split('\n')) {
+            const idList = ids.split('\n').filter(Boolean);
+            const nameList = names.split('\n').filter(Boolean);
+            await cleanupForwards([...idList, ...nameList]);
+            for (const id of idList) {
               await cleanupTmpdirs(id);
               await $`docker rm -f ${id}`.quiet().nothrow();
             }
-            for (const n of names.split('\n')) {
+            for (const n of nameList) {
               await $`docker volume rm ${n}`.nothrow().quiet();
             }
             spinner.succeed('Cleaned up all sessions');
@@ -255,6 +316,13 @@ try {
         if (inspectResult.exitCode !== 0) die(`no such container: ${id}`);
         const spinner = ora(`Removing ${id}...`).start();
         try {
+          const inspectRefs = await $`docker inspect --format ${'{{.Id}}|{{.Name}}'} ${id}`
+            .quiet()
+            .nothrow()
+            .text()
+            .then((s) => s.trim());
+          const refs = [id, ...inspectRefs.split('|').map(normalizeContainerRef)];
+          await cleanupForwards(refs);
           await cleanupTmpdirs(id);
           await $`docker stop ${id}`.quiet().nothrow();
           await $`docker rm ${id}`.quiet().nothrow();
