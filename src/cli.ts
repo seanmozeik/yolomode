@@ -48,6 +48,7 @@ if (hasFlag(args, "--complete")) {
 try {
 	switch (command) {
 		case "build": {
+			const verbose = hasFlag(args, "--verbose", "-v");
 			const ctx = await mkdtemp(join(tmpdir(), "yolomode-build-"));
 			try {
 				await writeFile(join(ctx, "Dockerfile"), DOCKERFILE);
@@ -57,18 +58,30 @@ try {
 				await writeFile(join(ctx, "ralph.sh"), RALPH_SH, {
 					mode: 0o755,
 				});
-				const spinner = ora("Building image...").start();
-				const buildArgs = hasFlag(args, "--no-cache")
-					? ["build", "--no-cache", "-t", IMAGE, ctx]
-					: ["build", "-t", IMAGE, ctx];
-				const result = await $`docker ${buildArgs}`.quiet().nothrow();
-				if (result.exitCode !== 0) {
-					spinner.fail("Build failed");
-					const stderr = result.stderr.toString().trim();
-					if (stderr) console.error(pc.dim(stderr));
-					process.exit(1);
+				const buildArgs = ["build", "-t", IMAGE];
+				if (hasFlag(args, "--no-cache")) buildArgs.push("--no-cache");
+				buildArgs.push(ctx);
+				if (verbose) {
+					// Inherit the parent TTY so docker emits ANSI colors and streams output live
+					const proc = Bun.spawn(["docker", ...buildArgs], {
+						stdin: "inherit",
+						stdout: "inherit",
+						stderr: "inherit",
+					});
+					const code = await proc.exited;
+					if (code !== 0) process.exit(code);
+					console.log(`\n${pc.green("✔")} Image built`);
+				} else {
+					const spinner = ora("Building image...").start();
+					const result = await $`docker ${buildArgs}`.quiet().nothrow();
+					if (result.exitCode !== 0) {
+						spinner.fail("Build failed");
+						const stderr = result.stderr.toString().trim();
+						if (stderr) console.error(pc.dim(stderr));
+						process.exit(1);
+					}
+					spinner.succeed("Image built");
 				}
-				spinner.succeed("Image built");
 			} finally {
 				await rm(ctx, { recursive: true, force: true });
 			}
@@ -281,7 +294,10 @@ try {
 			);
 			console.log();
 			const cmds = [
-				["build", "Build the Docker image (--no-cache for force rebuild)"],
+				[
+					"build",
+					"Build the Docker image  (--no-cache, -v/--verbose for live output)",
+				],
 				[
 					"run",
 					"Start a new isolated session  (--import <path> to copy files in)",
