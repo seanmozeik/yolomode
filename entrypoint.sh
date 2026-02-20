@@ -16,6 +16,9 @@ fi
 if [ -f /host-claude/.claude.json ]; then
   cp /host-claude/.claude.json "$HOME/.claude.json"
 fi
+if [ -f /host-claude/settings.json ]; then
+  cp /host-claude/settings.json "$HOME/.claude/settings.json"
+fi
 
 # Copy Codex auth from host mount
 if [ -f /host-codex/auth.json ]; then

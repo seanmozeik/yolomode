@@ -1,9 +1,8 @@
 #!/usr/bin/env bun
 import { $ } from "bun";
-import { mkdtemp, readFile, rm, writeFile } from "fs/promises";
+import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
-import { join, resolve, basename, dirname } from "path";
-import { createInterface } from "readline";
+import { join, basename } from "path";
 import DOCKERFILE from "../Dockerfile" with { type: "text" };
 import ENTRYPOINT from "../entrypoint.sh" with { type: "text" };
 import pc from "picocolors";
@@ -11,248 +10,40 @@ import boxen from "boxen";
 import { Table } from "console-table-printer";
 import ora from "ora";
 
-const IMAGE = "yolomode";
-
-const BANNER = `             _                           _      
-            | |                         | |     
- _   _  ___ | | ___  _ __ ___   ___   __| | ___ 
-| | | |/ _ \\| |/ _ \\| '_ \` _ \\ / _ \\ / _\` |/ _ \\
-| |_| | (_) | | (_) | | | | | | (_) | (_| |  __/
- \\__, |\\___/|_|\\___/|_| |_| |_|\\___/ \\__,_|\\___|
-  __/ |                                         
- |___/                                          
-`;
-const HOME = process.env.HOME!;
-
-const ADJECTIVES = [
-	"bold",
-	"brave",
-	"calm",
-	"cool",
-	"deft",
-	"fast",
-	"keen",
-	"fond",
-	"mild",
-	"sharp",
-	"slim",
-	"snug",
-	"warm",
-	"wild",
-	"wise",
-	"swift",
-	"quiet",
-	"grand",
-	"stark",
-	"vivid",
-];
-
-const ANIMALS = [
-	"fox",
-	"owl",
-	"elk",
-	"yak",
-	"emu",
-	"ape",
-	"ram",
-	"cod",
-	"jay",
-	"bee",
-	"ant",
-	"bat",
-	"cat",
-	"dog",
-	"hen",
-	"rat",
-	"pig",
-	"cow",
-	"bug",
-	"wren",
-];
-
-function generateName(): string {
-	const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-	const animal = ANIMALS[Math.floor(Math.random() * ANIMALS.length)];
-	return `${adj}-${animal}`;
-}
-
-async function generateUniqueName(): Promise<string> {
-	while (true) {
-		const name = generateName();
-		const existing = await $`docker ps -a --filter name=^${name}$ -q`
-			.quiet()
-			.text()
-			.then((s) => s.trim());
-		if (!existing) return name;
-	}
-}
-
-async function dirExists(path: string): Promise<boolean> {
-	return $`test -d ${path}`
-		.nothrow()
-		.quiet()
-		.then((r) => r.exitCode === 0);
-}
-
-function hasFlag(...flags: string[]): boolean {
-	return args.some((a) => flags.includes(a));
-}
-
-function getFlags(flag: string): string[] {
-	const values: string[] = [];
-	for (let i = 0; i < args.length; i++) {
-		if (args[i] === flag && i + 1 < args.length) {
-			values.push(args[i + 1]);
-			i++;
-		}
-	}
-	return values;
-}
-
-function parseLabel(
-	labels: string | Record<string, string> | null | undefined,
-	key: string,
-): string {
-	if (!labels) return "";
-	if (typeof labels === "object") return labels[key] ?? "";
-	for (const pair of labels.split(",")) {
-		const eq = pair.indexOf("=");
-		if (eq > 0 && pair.slice(0, eq) === key) return pair.slice(eq + 1);
-	}
-	return "";
-}
-
-async function copyImports(
-	id: string,
-	imports: Array<{ abs: string; base: string }>,
-) {
-	if (imports.length === 0) return;
-	await run($`docker exec ${id} mkdir -p /tmp/imports`);
-	for (const { abs, base } of imports) {
-		// Use tar|docker exec instead of docker cp — docker cp writes to the
-		// container's writable layer which is hidden by the --tmpfs mount on /tmp.
-		const dir = dirname(abs);
-		await run(
-			$`tar -cf - -C ${dir} ${base} | docker exec -i ${id} tar -xf - -C /tmp/imports/`,
-		);
-	}
-	const list = imports.map((i) => i.base).join(", ");
-	console.log(`${pc.green("✔")} Imported to /tmp/imports/:  ${pc.dim(list)}`);
-}
-
-async function resolveImports(
-	rawPaths: string[],
-): Promise<Array<{ abs: string; base: string }>> {
-	if (rawPaths.length === 0) return [];
-	const resolved = rawPaths.map((p) => resolve(p));
-	for (const p of resolved) {
-		const exists = await $`test -e ${p}`
-			.nothrow()
-			.quiet()
-			.then((r) => r.exitCode === 0);
-		if (!exists) die(`--import path does not exist: ${p}`);
-	}
-	const entries = resolved.map((p) => ({ abs: p, base: basename(p) }));
-	const seen = new Set<string>();
-	for (const { abs, base } of entries) {
-		if (!base) die(`--import path has no basename: ${abs}`);
-		if (seen.has(base)) die(`--import basename collision: "${base}"`);
-		seen.add(base);
-	}
-	return entries;
-}
-
-function die(msg: string): never {
-	console.error(`${pc.red(pc.bold("error:"))} ${msg}`);
-	process.exit(1);
-}
-
-function warn(msg: string) {
-	console.error(`${pc.yellow(pc.bold("warning:"))} ${msg}`);
-}
-
-async function confirm(question: string): Promise<boolean> {
-	if (!process.stdin.isTTY) return false;
-	const rl = createInterface({ input: process.stdin, output: process.stdout });
-	return new Promise((resolve) => {
-		rl.question(
-			`${pc.yellow(pc.bold("confirm:"))} ${question} [y/N] `,
-			(answer) => {
-				rl.close();
-				resolve(answer.trim().toLowerCase() === "y");
-			},
-		);
-	});
-}
-
-async function run(cmd: ReturnType<typeof $>) {
-	const result = await cmd.nothrow().quiet();
-	if (result.exitCode !== 0) {
-		const stderr = result.stderr.toString().trim();
-		die(stderr || `command failed (exit ${result.exitCode})`);
-	}
-	return result;
-}
-
-async function ensureRunning(id: string) {
-	const status = await $`docker inspect -f ${"{{.State.Running}}"} ${id}`
-		.quiet()
-		.nothrow()
-		.text()
-		.then((s) => s.trim());
-	if (status !== "true") {
-		await run($`docker start ${id}`);
-	}
-}
-
-// Extract Claude Code OAuth credentials from macOS keychain
-async function getClaudeCredentials(): Promise<string> {
-	return $`security find-generic-password -s "Claude Code-credentials" -w 2>/dev/null || true`
-		.quiet()
-		.text()
-		.then((s) => s.trim());
-}
-
-// Read ~/.claude.json, strip installMethod (host-specific), write to temp file
-async function preprocessClaudeConfig(srcPath: string): Promise<string> {
-	try {
-		const data = await readFile(srcPath, "utf-8");
-		const config = JSON.parse(data);
-		delete config.installMethod;
-		const tmpDir = join(HOME, ".yolomode", "tmp");
-		await $`mkdir -p ${tmpDir}`.quiet();
-		const tmpPath = join(tmpDir, "claude-config.json");
-		await writeFile(tmpPath, JSON.stringify(config, null, 2), { mode: 0o644 });
-		return tmpPath;
-	} catch {
-		return "";
-	}
-}
-
-// Warn if Docker VM has insufficient RAM for parallel agents
-async function checkDockerMemory() {
-	try {
-		const mem = await $`docker info --format ${"{{.MemTotal}}"}`
-			.quiet()
-			.text()
-			.then((s) => s.trim());
-		const memBytes = parseInt(mem, 10);
-		if (!isNaN(memBytes)) {
-			const memGB = memBytes / (1024 * 1024 * 1024);
-			if (memGB < 6) {
-				warn(
-					`Docker has only ${memGB.toFixed(1)}GB RAM. Parallel agents will likely OOM.`,
-				);
-				warn("Increase Docker/Colima memory to 8GB+ for best results.");
-			}
-		}
-	} catch {
-		/* ignore */
-	}
-}
+import { IMAGE, BANNER } from "./constants";
+import {
+	die,
+	hasFlag,
+	getFlags,
+	parseLabel,
+	ensureRunning,
+	run,
+	resolveImports,
+	copyImports,
+} from "./utils";
+import { cmdRun } from "./cmd-run";
+import { cmdApply } from "./cmd-apply";
+import { cmdCompletions } from "./completions";
+import { cmdRalph, RALPH_SH } from "./cmd-ralph";
 
 const args = process.argv.slice(2);
 const command = args[0];
+
+// Hidden flag for shell completion callbacks
+if (hasFlag(args, "--complete")) {
+	const idx = args.indexOf("--complete");
+	const what = args[idx + 1];
+	if (what === "sessions") {
+		const names =
+			await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
+				.quiet()
+				.nothrow()
+				.text()
+				.then((s) => s.trim());
+		if (names) process.stdout.write(names + "\n");
+	}
+	process.exit(0);
+}
 
 try {
 	switch (command) {
@@ -263,8 +54,11 @@ try {
 				await writeFile(join(ctx, "entrypoint.sh"), ENTRYPOINT, {
 					mode: 0o755,
 				});
+				await writeFile(join(ctx, "ralph.sh"), RALPH_SH, {
+					mode: 0o755,
+				});
 				const spinner = ora("Building image...").start();
-				const buildArgs = hasFlag("--no-cache")
+				const buildArgs = hasFlag(args, "--no-cache")
 					? ["build", "--no-cache", "-t", IMAGE, ctx]
 					: ["build", "-t", IMAGE, ctx];
 				const result = await $`docker ${buildArgs}`.quiet().nothrow();
@@ -282,185 +76,7 @@ try {
 		}
 
 		case "run": {
-			const name = await generateUniqueName();
-			const mounts: string[] = [];
-
-			const importPaths = getFlags("--import");
-			const imports = await resolveImports(importPaths);
-
-			const memoryFlags = getFlags("--memory");
-			const memLimit = memoryFlags[memoryFlags.length - 1] ?? "16g";
-
-			await checkDockerMemory();
-			const spinner = ora("Preparing session...").start();
-
-			// --- Claude auth: keychain creds + preprocessed config ---
-			const creds = await getClaudeCredentials();
-			if (creds) {
-				const tmp = await mkdtemp(join(tmpdir(), "yolomode-"));
-				const credsPath = join(tmp, "credentials.json");
-				await writeFile(credsPath, creds, { mode: 0o600 });
-				mounts.push("-v", `${credsPath}:/host-claude/.credentials.json:ro`);
-			}
-
-			const claudeJson = join(HOME, ".claude.json");
-			if (await Bun.file(claudeJson).exists()) {
-				const processed = await preprocessClaudeConfig(claudeJson);
-				if (processed) {
-					mounts.push("-v", `${processed}:/host-claude/.claude.json:ro`);
-				}
-			}
-
-			// --- Claude config: skills, plugins, root CLAUDE.md (direct mount) ---
-			const claudeSkills = join(HOME, ".claude", "skills");
-			if (await dirExists(claudeSkills)) {
-				mounts.push("-v", `${claudeSkills}:/home/yolo/.claude/skills:ro`);
-			}
-
-			const claudePlugins = join(HOME, ".claude", "plugins");
-			if (await dirExists(claudePlugins)) {
-				mounts.push("-v", `${claudePlugins}:/home/yolo/.claude/plugins:ro`);
-			}
-
-			const claudeRootMd = join(HOME, ".claude", "CLAUDE.md");
-			if (await Bun.file(claudeRootMd).exists()) {
-				mounts.push("-v", `${claudeRootMd}:/home/yolo/.claude/CLAUDE.md:ro`);
-			}
-
-			// --- Codex auth ---
-			const codexAuth = join(HOME, ".codex", "auth.json");
-			if (await Bun.file(codexAuth).exists()) {
-				mounts.push("-v", `${codexAuth}:/host-codex/auth.json:ro`);
-			}
-
-			// --- Host git identity ---
-			const gitName = await $`git config --global user.name`
-				.quiet()
-				.nothrow()
-				.text()
-				.then((s) => s.trim());
-			const gitEmail = await $`git config --global user.email`
-				.quiet()
-				.nothrow()
-				.text()
-				.then((s) => s.trim());
-
-			// --- Optional host config ---
-			const starshipCfg = join(
-				process.env.XDG_CONFIG_HOME || join(HOME, ".config"),
-				"starship.toml",
-			);
-			if (await Bun.file(starshipCfg).exists()) {
-				mounts.push("-v", `${starshipCfg}:/home/yolo/.config/starship.toml:ro`);
-			}
-
-			// Named volume for /work — survives container kills and removes
-			await $`docker volume create ${name}`.quiet();
-			await $`docker run --rm -v ${name}:/work alpine chown 1000:1000 /work`.quiet();
-
-			spinner.succeed(`Session ${pc.cyan(pc.bold(name))} ready`);
-			console.log();
-
-			const cols = process.stdout.columns || 80;
-			const rows = process.stdout.rows || 24;
-
-			// Start detached so we can copy imports before handing over the shell
-			const dockerArgs = [
-				"run",
-				"-dit",
-				"--name",
-				name,
-				"--label",
-				`yolomode.src=${process.cwd()}`,
-				"-v",
-				`${name}:/work`,
-				"-v",
-				`${process.cwd()}:/src:ro`,
-				...mounts,
-				"-e",
-				"ANTHROPIC_API_KEY",
-				"-e",
-				"OPENAI_API_KEY",
-				"-e",
-				"TERM",
-				"-e",
-				`COLUMNS=${cols}`,
-				"-e",
-				`LINES=${rows}`,
-				...(gitName
-					? [
-							"-e",
-							`GIT_AUTHOR_NAME=${gitName}`,
-							"-e",
-							`GIT_COMMITTER_NAME=${gitName}`,
-						]
-					: []),
-				...(gitEmail
-					? [
-							"-e",
-							`GIT_AUTHOR_EMAIL=${gitEmail}`,
-							"-e",
-							`GIT_COMMITTER_EMAIL=${gitEmail}`,
-						]
-					: []),
-				"--cap-drop",
-				"ALL",
-				"--security-opt",
-				"no-new-privileges:true",
-				"--shm-size",
-				"1g",
-				"--tmpfs",
-				"/tmp:nosuid,size=2g",
-				"--memory",
-				memLimit,
-				IMAGE,
-			];
-
-			await run($`docker ${dockerArgs}`);
-			await copyImports(name, imports);
-			await Bun.spawn(
-				[
-					"docker",
-					"exec",
-					"-it",
-					"-e",
-					"TERM",
-					"-e",
-					`COLUMNS=${cols}`,
-					"-e",
-					`LINES=${rows}`,
-					"-w",
-					"/work",
-					name,
-					"sh",
-					"-c",
-					`stty cols ${cols} rows ${rows} 2>/dev/null; exec zsh`,
-				],
-				{ stdin: "inherit", stdout: "inherit", stderr: "inherit" },
-			).exited;
-
-			console.log();
-			const nextStepLines = [
-				`${pc.cyan(pc.bold("attach"))}   yolomode attach ${name}`,
-				`${pc.cyan(pc.bold("diff"))}     yolomode diff ${name}`,
-				`${pc.cyan(pc.bold("apply"))}    yolomode apply ${name}`,
-				`${pc.cyan(pc.bold("rm"))}       yolomode rm ${name}`,
-			];
-			if (imports.length > 0) {
-				const list = imports.map((i) => i.base).join(", ");
-				nextStepLines.push(
-					`${pc.cyan(pc.bold("imports"))}  /tmp/imports/  ${pc.dim(`(${list})`)}`,
-				);
-			}
-			console.log(
-				boxen(nextStepLines.join("\n"), {
-					title: `${name}`,
-					titleAlignment: "left",
-					borderColor: "cyan",
-					borderStyle: "round",
-					padding: { top: 1, bottom: 1, left: 2, right: 2 },
-				}),
-			);
+			await cmdRun(args);
 			break;
 		}
 
@@ -468,7 +84,6 @@ try {
 		case "attach": {
 			let id = args[1];
 			if (!id || id.startsWith("--")) {
-				// If exactly one container is running, attach to it automatically
 				const running =
 					await $`docker ps --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
 						.quiet()
@@ -485,7 +100,7 @@ try {
 					);
 				}
 			}
-			const importPaths = getFlags("--import");
+			const importPaths = getFlags(args, "--import");
 			const imports = await resolveImports(importPaths);
 			await ensureRunning(id);
 			await copyImports(id, imports);
@@ -534,8 +149,18 @@ try {
 				],
 				style: {
 					headerTop: { left: "┌", mid: "┬", other: "─", right: "┐" },
-					headerBottom: { left: "├", mid: "┼", other: "─", right: "┤" },
-					tableBottom: { left: "└", mid: "┴", other: "─", right: "┘" },
+					headerBottom: {
+						left: "├",
+						mid: "┼",
+						other: "─",
+						right: "┤",
+					},
+					tableBottom: {
+						left: "└",
+						mid: "┴",
+						other: "─",
+						right: "┘",
+					},
 					vertical: "│",
 				},
 			});
@@ -575,122 +200,14 @@ try {
 		}
 
 		case "apply": {
-			const id = args[1];
-			if (!id) die("usage: yolomode apply <name>");
-
-			// Warn if applying from a different directory than where the session was created
-			const srcLabel =
-				await $`docker inspect --format ${'{{index .Config.Labels "yolomode.src"}}'} ${id}`
-					.quiet()
-					.nothrow()
-					.text()
-					.then((s) => s.trim());
-			if (srcLabel && srcLabel !== process.cwd()) {
-				warn(`Session was started in: ${pc.cyan(srcLabel)}`);
-				warn(`You are currently in:   ${pc.cyan(process.cwd())}`);
-				const ok = await confirm("Apply anyway?");
-				if (!ok) process.exit(1);
-			}
-
-			// Only block on tracked changes; untracked files (?? lines) are fine
-			const statusOutput = await $`git status --porcelain`
-				.quiet()
-				.text()
-				.then((s) => s.trim());
-			const conflicting = statusOutput
-				.split("\n")
-				.filter((l) => l.length > 0 && !l.startsWith("??"));
-			if (conflicting.length > 0)
-				die(
-					"working tree has uncommitted tracked changes — commit or stash first",
-				);
-
-			await ensureRunning(id);
-
-			// Stage everything in the container
-			await $`docker exec ${id} git -C /work add -A`.quiet();
-
-			// Commits since yolomode-base (oldest first)
-			const commits =
-				await $`docker exec ${id} git -C /work log --reverse --format=%H yolomode-base..HEAD`
-					.quiet()
-					.text()
-					.then((s) => s.trim().split("\n").filter(Boolean));
-
-			// Uncommitted WIP above HEAD (staged by git add -A above)
-			const wipPatch =
-				await $`docker exec ${id} git -C /work diff --cached --full-index --binary HEAD`
-					.quiet()
-					.text();
-			const hasWip = wipPatch.trim().length > 0;
-
-			if (commits.length === 0 && !hasWip) die("no changes to apply");
-
-			const branch = `yolomode/${id}`;
-			const base = await $`git rev-parse --abbrev-ref HEAD`
-				.quiet()
-				.text()
-				.then((s) => s.trim());
-			const spinner = ora("Applying changes...").start();
-			const patchDir = join(tmpdir(), `yolomode-${id}-patches`);
-			const wipFile = join(tmpdir(), `yolomode-${id}-wip.patch`);
-			let branchCreated = false;
-			let committedCount = 0;
-
-			try {
-				await $`git checkout -b ${branch}`;
-				branchCreated = true;
-
-				if (commits.length > 0) {
-					// format-patch preserves individual commit messages and authorship.
-					// Use /home/yolo (not /tmp) — docker cp reads from the overlay layer,
-					// which is hidden by the --tmpfs mount on /tmp.
-					await $`docker exec ${id} sh -c ${"rm -rf /home/yolo/ym-patches && mkdir /home/yolo/ym-patches && git -C /work format-patch --binary yolomode-base..HEAD -o /home/yolo/ym-patches/"}`.quiet();
-					await $`mkdir -p ${patchDir}`;
-					await $`docker cp ${id}:/home/yolo/ym-patches ${patchDir}`;
-					const patchesDir = join(patchDir, "ym-patches");
-					const patches = [...new Bun.Glob("*.patch").scanSync(patchesDir)]
-						.sort()
-						.map((f) => join(patchesDir, f));
-					await $`git am --3way ${patches}`;
-					committedCount = commits.length;
-				}
-
-				// Apply any uncommitted WIP on top
-				if (hasWip) {
-					await writeFile(wipFile, wipPatch);
-					await $`git apply ${wipFile}`;
-					await $`git add -A`;
-					const wipMsg =
-						commits.length > 0 ? "yolomode: wip" : `yolomode: ${id}`;
-					await $`git commit -m ${wipMsg}`;
-					committedCount++;
-				}
-
-				const plural = committedCount !== 1 ? "s" : "";
-				spinner.succeed(
-					`Branch created: ${pc.cyan(pc.bold(branch))} (${committedCount} commit${plural})`,
-				);
-				await $`git checkout ${base}`;
-			} catch (e) {
-				await $`git am --abort`.nothrow().quiet();
-				spinner.fail("Failed to apply changes");
-				if (branchCreated) {
-					await $`git checkout ${base}`.nothrow().quiet();
-					await $`git branch -D ${branch}`.nothrow().quiet();
-				}
-				throw e;
-			} finally {
-				await rm(patchDir, { recursive: true, force: true });
-				await rm(wipFile, { force: true });
-			}
+			await cmdApply(args);
 			break;
 		}
 
 		case "sync": {
 			const id = args[1];
 			if (!id) die("usage: yolomode sync <name>");
-			const dest = join(HOME, ".yolomode", id);
+			const dest = join(process.env.HOME!, ".yolomode", id);
 			await $`mkdir -p ${dest}`;
 			await $`docker cp ${id}:/work/. ${dest}/`;
 			console.log(
@@ -700,23 +217,20 @@ try {
 		}
 
 		case "rm": {
-			if (hasFlag("--all", "-a")) {
-				// Stop all running containers first
-				const runningIds =
-					await $`docker ps --filter ancestor=${IMAGE} -q`
-						.quiet()
-						.text()
-						.then((s) => s.trim());
+			if (hasFlag(args, "--all", "-a")) {
+				const runningIds = await $`docker ps --filter ancestor=${IMAGE} -q`
+					.quiet()
+					.text()
+					.then((s) => s.trim());
 				if (runningIds) {
 					for (const id of runningIds.split("\n")) {
 						await $`docker stop ${id}`.quiet().nothrow();
 					}
 				}
-				const ids =
-					await $`docker ps -a --filter ancestor=${IMAGE} -q`
-						.quiet()
-						.text()
-						.then((s) => s.trim());
+				const ids = await $`docker ps -a --filter ancestor=${IMAGE} -q`
+					.quiet()
+					.text()
+					.then((s) => s.trim());
 				const names =
 					await $`docker ps -a --filter ancestor=${IMAGE} --format ${"{{.Names}}"}`
 						.quiet()
@@ -746,6 +260,16 @@ try {
 			break;
 		}
 
+		case "completions": {
+			await cmdCompletions(args);
+			break;
+		}
+
+		case "ralph": {
+			await cmdRalph(args);
+			break;
+		}
+
 		default: {
 			console.log(
 				boxen(pc.cyan(BANNER) + "\n\n" + pc.dim("isolated dev sessions"), {
@@ -771,9 +295,11 @@ try {
 				["apply <name>", "Apply session changes to a new branch"],
 				["sync <name>", "Extract full work dir from a session"],
 				["rm <name>", "Remove a session (-a/--all for all stopped)"],
+				["completions <sh>", "Print shell completions (bash|zsh|fish|nu)"],
+				["ralph <name>", "Run ralph autonomous loop (--max-iterations N)"],
 			];
 			for (const [cmd, desc] of cmds) {
-				console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(16)))}${pc.dim(desc)}`);
+				console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(20)))}${pc.dim(desc)}`);
 			}
 			console.log();
 			if (command) die(`unknown command: ${command}`);

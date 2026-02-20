@@ -112,6 +112,93 @@ yolomode build --no-cache
 
 Builds from scratch, no cache. Use after bumping tool versions or modifying the Dockerfile.
 
+## Ralph: Autonomous PRD Loop
+
+Ralph is an autonomous implementation loop built into yolomode. It repeatedly runs Claude Code against a `prd.json` file, picking the highest-priority incomplete story each iteration, implementing it, running quality checks, committing, and marking it done. The loop exits when all stories are complete.
+
+### Running from the host
+
+```
+yolomode ralph swift-fox
+yolomode ralph swift-fox --max-iterations 20
+```
+
+This runs the loop from your host machine, targeting a named container. Output streams in real time. Defaults to 10 iterations. If only one session is running, the name is optional.
+
+### Running inside a container
+
+The `ralph` command is also available on PATH inside every container:
+
+```
+ralph           # default 10 iterations
+ralph 20        # custom max iterations
+```
+
+### PRD format
+
+Create a `prd.json` in your project root:
+
+```json
+{
+  "name": "My Feature",
+  "branchName": "ralph/my-feature",
+  "description": "What this feature does",
+  "stories": [
+    {
+      "id": "story-1",
+      "title": "Add database schema",
+      "description": "Create the users table with email and name columns",
+      "priority": 1,
+      "status": "pending",
+      "acceptanceCriteria": [
+        "Migration file exists",
+        "Typecheck passes"
+      ]
+    }
+  ]
+}
+```
+
+A bundled ralph skill is mounted into every container at `~/.claude/skills/ralph.md`, teaching Claude Code how to work with the PRD format. You can also use the skill to convert a markdown PRD document into `prd.json`.
+
+## Shell Completions
+
+Generate completion scripts for your shell:
+
+```bash
+# Bash — add to ~/.bashrc
+eval "$(yolomode completions bash)"
+
+# Zsh — add to ~/.zshrc
+eval "$(yolomode completions zsh)"
+
+# Fish — add to ~/.config/fish/config.fish
+yolomode completions fish | source
+
+# Nushell — save and source in config.nu
+yolomode completions nu | save -f ~/.config/nushell/yolomode.nu
+source ~/.config/nushell/yolomode.nu
+```
+
+Completions include all subcommands, flags, and dynamic session name completion (for attach, diff, apply, sync, rm, ralph).
+
+## Configuration
+
+### Claude Code settings
+
+Place a `settings.json` at `~/.config/yolomode/settings.json` (or `$XDG_CONFIG_HOME/yolomode/settings.json`) to inject Claude Code settings into every session. This file is copied into the container as `~/.claude/settings.json`.
+
+### What gets mounted
+
+| Host path | Container path | Notes |
+|-----------|---------------|-------|
+| `~/.claude/skills/` | `~/.claude/skills/` | Read-only, plus bundled ralph skill |
+| `~/.claude/plugins/` | `~/.claude/plugins/` | Read-only |
+| `~/.claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Read-only |
+| `~/.config/yolomode/settings.json` | `~/.claude/settings.json` | Copied by entrypoint |
+| `~/.config/starship.toml` | `~/.config/starship.toml` | Read-only |
+| `~/.claude.json` | `~/.claude.json` | Preprocessed (installMethod stripped) |
+
 ## How isolation works
 
 Your working directory is mounted read-only at `/src` inside the container. On first boot, the entrypoint copies everything (tracked and untracked files, excluding gitignored paths) into `/work`. The agent operates on that copy. The host filesystem is never written to.
@@ -129,6 +216,23 @@ Installed via apk: node, git, curl, jq, zsh, build-base, openssh, github-cli.
 Installed via Bun: Claude Code, Codex.
 Installed via cargo-binstall: ripgrep, fd, sd, starship.
 Your starship.toml is mounted into the container if it exists.
+
+## Project structure
+
+```
+src/
+  cli.ts          Entry point + command dispatcher
+  constants.ts    Shared constants (image name, session name words)
+  utils.ts        Shared utilities (docker helpers, arg parsing, output)
+  cmd-run.ts      `run` command (session creation, mounts, credentials)
+  cmd-apply.ts    `apply` command (patch extraction and git workflow)
+  cmd-ralph.ts    `ralph` command (autonomous loop + text imports)
+  completions.ts  Shell completion scripts (bash, zsh, fish, nushell)
+Dockerfile        Multi-stage Alpine build
+entrypoint.sh     Container startup (credential copy, repo init)
+ralph.sh          In-container autonomous loop script
+ralph-skill.md    PRD skill bundled into containers
+```
 
 ## Development
 

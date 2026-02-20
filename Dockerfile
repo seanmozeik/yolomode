@@ -125,7 +125,7 @@ RUN chown -R yolo:yolo /usr/local/bun
 RUN mkdir -p /usr/local/share/npm-global && \
     chown -R yolo:yolo /usr/local/share
 # Prepare writable directories owned by yolo user
-RUN mkdir -p /home/yolo/.claude /home/yolo/.codex \
+RUN mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
     /home/yolo/.cargo/bin /home/yolo/go/bin \
     /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
     /home/yolo/.local/bin \
@@ -134,6 +134,8 @@ RUN mkdir -p /home/yolo/.claude /home/yolo/.codex \
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+COPY ralph.sh /usr/local/bin/ralph
+RUN chmod +x /usr/local/bin/ralph
 
 USER yolo
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
