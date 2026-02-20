@@ -1,6 +1,7 @@
 # Build the yolomode CLI binary
 build:
   bun build --compile --minify --bytecode --format esm src/cli.ts --outfile yolomode
+  rm -f .*.bun-build
 
 # Install to /usr/local/bin
 install: build

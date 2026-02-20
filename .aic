@@ -1,0 +1,45 @@
+# yolomode Release Configuration
+
+[release]
+# Clean and create dist directory
+rm -rf dist && mkdir -p dist
+
+# Bundle to JS for macOS/Linux (via Homebrew with depends_on "bun")
+bun build ./src/cli.ts --outdir dist --target=bun --bytecode --minify
+
+# Build Windows binary (compiled, since no Homebrew)
+bun build ./src/cli.ts --compile --target=bun-windows-x64 --bytecode --outfile dist/yolomode-windows-x64.exe --minify
+
+# Clean up bun build artifacts
+rm -f ./.*bun-build
+
+# Create source tarball with bundled files (exclude binaries and archives)
+VERSION=$(bun -p "require('./package.json').version") && \
+tar -czvf "dist/yolomode-${VERSION}.tar.gz" -C dist --exclude='*.tar.gz' --exclude='*.exe' --exclude='*.zip' .
+
+# Create Windows zip
+cd dist && zip yolomode-windows-x64.zip yolomode-windows-x64.exe && rm yolomode-windows-x64.exe
+
+# Generate checksums
+VERSION=$(bun -p "require('./package.json').version") && \
+bun -e 'for(const f of[`yolomode-${process.argv[1]}.tar.gz`,"yolomode-windows-x64.zip"]){console.log(new Bun.CryptoHasher("sha256").update(await Bun.file("dist/"+f).arrayBuffer()).digest("hex")+"  "+f)}' "$VERSION" > dist/checksums.txt && cat dist/checksums.txt
+
+[publish]
+# Publish to npm
+bun publish
+
+# Create GitHub release with bundled tarball and Windows binary
+gh release create "v$(bun -p "require('./package.json').version")" dist/*.tar.gz dist/*.zip dist/checksums.txt --title "v$(bun -p "require('./package.json').version")" --notes "$(aic changelog-latest)"
+
+# Update Homebrew formula with new version and SHA256
+VERSION=$(bun -p "require('./package.json').version") && \
+SHA=$(bun -e 'console.log(new Bun.CryptoHasher("sha256").update(await Bun.file("dist/yolomode-"+process.argv[1]+".tar.gz").arrayBuffer()).digest("hex"))' "$VERSION") && \
+sed -i '' "s/version \".*\"/version \"$VERSION\"/" Formula/yolomode.rb && \
+sed -i '' "s/sha256 \".*\"/sha256 \"$SHA\"/" Formula/yolomode.rb
+
+# Copy formula to tap and commit
+cp Formula/yolomode.rb ~/workspace/tap/Formula/yolomode.rb && \
+cd ~/workspace/tap && \
+git add Formula/yolomode.rb && \
+git commit -m "yolomode $(bun -p "require('$OLDPWD/package.json').version")" && \
+git push

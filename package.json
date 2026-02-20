@@ -1,19 +1,41 @@
 {
-	"name": "yolomode",
-	"version": "0.1.0",
-	"scripts": {
-		"build": "bun build --compile src/cli.ts --outfile yolomode",
-		"dev": "bun run src/cli.ts"
-	},
-	"devDependencies": {
-		"@types/bun": "^1.3.9",
-		"typescript": "^5.9.3"
-	},
-	"dependencies": {
-		"boxen": "^8.0.1",
-		"console-table-printer": "^2.15.0",
-		"gradient-string": "^3.0.0",
-		"ora": "^9.3.0",
-		"picocolors": "^1.1.1"
-	}
+  "name": "yolomode",
+  "version": "0.1.0",
+  "description": "Claude Code skill manager and agent runner",
+  "type": "module",
+  "bin": {
+    "yolomode": "src/cli.ts"
+  },
+  "files": [
+    "src",
+    "package.json"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seanmozeik/yolomode.git"
+  },
+  "scripts": {
+    "build": "bun build --compile src/cli.ts --outfile yolomode",
+    "bundle": "bun build ./src/cli.ts --outdir dist --target=bun --bytecode --minify",
+    "check": "biome check --write --unsafe .",
+    "dev": "bun run src/cli.ts",
+    "format": "biome format --write .",
+    "tc": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.13",
+    "@types/bun": "^1.3.9",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "boxen": "^8.0.1",
+    "console-table-printer": "^2.15.0",
+    "gradient-string": "^3.0.0",
+    "ora": "^9.3.0",
+    "picocolors": "^1.1.1"
+  }
 }
