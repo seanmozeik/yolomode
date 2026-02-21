@@ -101,8 +101,8 @@
         "Main layout is a horizontal flex row: [left panel] [center placeholder] [right placeholder]",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created src/watch/components/SessionList.tsx with status indicators (● green running / ○ dim stopped), j/k/arrow nav, Enter to set active session, 1s auto-refresh with onCleanup. Updated cmd-watch.tsx: horizontal flex row layout with left panel (30-col bordered box, Show conditional on leftPanelOpen), center and right placeholders. [ toggles leftPanelOpen, Tab cycles activePane sessions→terminal→diff. Typecheck passes."
     },
     {
       "id": "US-007",
