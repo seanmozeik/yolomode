@@ -1,23 +1,23 @@
-import { extname, basename } from 'node:path';
+import { basename, extname } from 'node:path';
 
 export const FILE_ICONS: Record<string, string> = {
-  '.ts': '', // nf-seti-typescript
-  '.tsx': '', // nf-seti-typescript (tsx variant)
-  '.js': '', // nf-seti-javascript
-  '.jsx': '', // nf-seti-javascript (jsx variant)
-  '.json': '', // nf-seti-json
-  '.md': '', // nf-seti-markdown
-  '.sh': '', // nf-seti-shell
-  '.toml': '', // nf-seti-config
-  '.yaml': '', // nf-seti-yaml
-  '.yml': '', // nf-seti-yaml
   '.css': '', // nf-seti-css
-  '.scss': '', // nf-seti-sass
+  '.go': '', // nf-seti-go
   '.html': '', // nf-seti-html
+  '.js': '', // nf-seti-javascript
+  '.json': '', // nf-seti-json
+  '.jsx': '', // nf-seti-javascript (jsx variant)
+  '.lock': '', // nf-fa-lock
+  '.md': '', // nf-seti-markdown
   '.py': '', // nf-seti-python
   '.rs': '', // nf-seti-rust
-  '.go': '', // nf-seti-go
-  '.lock': '' // nf-fa-lock
+  '.scss': '', // nf-seti-sass
+  '.sh': '', // nf-seti-shell
+  '.toml': '', // nf-seti-config
+  '.ts': '', // nf-seti-typescript
+  '.tsx': '', // nf-seti-typescript (tsx variant)
+  '.yaml': '', // nf-seti-yaml
+  '.yml': '' // nf-seti-yaml
 };
 
 export function getFileIcon(filename: string): string {
