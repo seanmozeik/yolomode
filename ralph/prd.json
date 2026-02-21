@@ -81,8 +81,8 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TDD: wrote 7 failing tests first (running+stopped, sort order, slash stripping, empty array, field mapping, exited→stopped). Created src/watch/docker.ts with listSessions() using injectable CommandRunner for test mocking. Uses docker ps -a --filter ancestor=yolomode --format json. Session type exported. All tests pass, typecheck passes."
     },
     {
       "id": "US-006",
