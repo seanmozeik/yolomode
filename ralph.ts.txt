@@ -43,7 +43,7 @@ function gradientBanner(text: string, stops: string[]): string {
 console.log(gradientBanner(BANNER, ['#ca9ee6', '#f4b8e4', '#babbf1']));
 
 const PROMPT =
-  'Read prd.json in the current directory. Find the highest-priority story with status "pending". Set its status to "in_progress" and save prd.json. Then implement the story fully: write the code, run any available tests, typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update prd.json to set the story status to "complete" and commit that change too. If ALL stories already have status "complete", output exactly <promise>COMPLETE</promise> and do nothing else.';
+  'Read ralph/prd.json in the current directory. Find the highest-priority userStory where passes is false. Implement it fully: write the code, run any available tests (bun test), typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update ralph/prd.json to set that story\'s passes to true and add a brief implementation note in the notes field, then commit that change too. If ALL userStories already have passes true, output exactly <promise>COMPLETE</promise> and do nothing else.';
 
 const argv = process.argv.slice(2);
 
