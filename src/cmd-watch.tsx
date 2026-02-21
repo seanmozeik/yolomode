@@ -1,5 +1,6 @@
 import type { KeyEvent } from '@opentui/core';
 import { render, useKeyboard, useRenderer } from '@opentui/solid';
+import { DialogProvider } from '@opentui-ui/dialog/solid';
 import { Show } from 'solid-js';
 import { AgentTerminal } from './watch/components/AgentTerminal';
 import { SessionList } from './watch/components/SessionList';
@@ -40,7 +41,9 @@ function WatchLayout() {
 function App() {
   return (
     <AppProvider>
-      <WatchLayout />
+      <DialogProvider>
+        <WatchLayout />
+      </DialogProvider>
     </AppProvider>
   );
 }
