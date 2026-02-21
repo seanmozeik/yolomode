@@ -1,3 +1,5 @@
+import boxen from 'boxen';
+import ora from 'ora';
 import pc from 'picocolors';
 import RALPH_SH from '../ralph.sh' with { type: 'text' };
 import { die, ensureRunning, getFlags, getWorkDir, resolveSession, warn } from './utils';
@@ -7,6 +9,67 @@ type RalphAgent = 'claude' | 'codex';
 
 function isRalphAgent(value: string): value is RalphAgent {
   return value === 'claude' || value === 'codex';
+}
+
+interface PrdStory {
+  id: string;
+  title: string;
+  status: 'pending' | 'in_progress' | 'complete';
+  priority?: number;
+}
+
+interface Prd {
+  stories: PrdStory[];
+}
+
+async function readPrd(containerId: string, workDir: string): Promise<Prd> {
+  const proc = Bun.spawn(['docker', 'exec', '-w', workDir, containerId, 'cat', 'prd.json'], {
+    stderr: 'pipe',
+    stdout: 'pipe'
+  });
+  await proc.exited;
+  if (proc.exitCode !== 0) {
+    die('no prd.json found in work dir');
+  }
+  const text = await new Response(proc.stdout).text();
+  let prd: Prd;
+  try {
+    prd = JSON.parse(text) as Prd;
+  } catch {
+    die('prd.json is not valid JSON');
+  }
+  if (!Array.isArray(prd!.stories)) {
+    die('prd.json is missing a "stories" array');
+  }
+  return prd!;
+}
+
+function activeStory(prd: Prd): PrdStory | undefined {
+  return (
+    prd.stories.find((s) => s.status === 'in_progress') ??
+    prd.stories
+      .filter((s) => s.status === 'pending')
+      .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))[0]
+  );
+}
+
+function summaryPanel(prd: Prd, success: boolean): string {
+  const lines = prd.stories.map((s) => {
+    const icon =
+      s.status === 'complete'
+        ? pc.green('✔')
+        : s.status === 'in_progress'
+          ? pc.yellow('…')
+          : pc.red('✗');
+    return `${icon}  ${pc.dim(s.id.padEnd(12))} ${s.title}`;
+  });
+  return boxen(lines.join('\n'), {
+    borderColor: success ? 'green' : 'yellow',
+    borderStyle: 'round',
+    padding: { bottom: 0, left: 2, right: 2, top: 0 },
+    title: success ? pc.green(pc.bold('complete')) : pc.yellow(pc.bold('incomplete')),
+    titleAlignment: 'left'
+  });
 }
 
 export async function cmdRalph(args: string[]): Promise<void> {
@@ -51,7 +114,20 @@ export async function cmdRalph(args: string[]): Promise<void> {
   );
 
   for (let i = 1; i <= maxIter; i++) {
-    console.log(`\n${pc.cyan(pc.bold(`ralph: iteration ${i}/${maxIter}`))}`);
+    const prd = await readPrd(id, workDir);
+    const story = activeStory(prd);
+    const storyLine = story
+      ? `${pc.cyan(pc.bold(story.id))}: ${story.title}`
+      : pc.dim('(picking next pending story)');
+    console.log(
+      boxen(`${storyLine}\n${pc.dim(`iteration ${i}/${maxIter} · ${agent}`)}`, {
+        borderColor: 'cyan',
+        borderStyle: 'round',
+        padding: { bottom: 0, left: 2, right: 2, top: 0 },
+        title: pc.cyan(pc.bold('ralph')),
+        titleAlignment: 'left'
+      })
+    );
 
     const agentCmd =
       agent === 'claude'
@@ -76,15 +152,20 @@ export async function cmdRalph(args: string[]): Promise<void> {
     await proc.exited;
 
     if (output.includes('<promise>COMPLETE</promise>')) {
-      console.log(pc.green(pc.bold('\nralph: all stories complete!')));
+      const finalPrd = await readPrd(id, workDir);
+      console.log('\n' + summaryPanel(finalPrd, true));
       process.exit(0);
     }
 
     if (i < maxIter) {
+      const sleepSpinner = ora({ text: pc.dim('next story in 2s…'), color: 'cyan' }).start();
       await Bun.sleep(2000);
+      sleepSpinner.stop();
     }
   }
 
+  const finalPrd = await readPrd(id, workDir);
+  console.log('\n' + summaryPanel(finalPrd, false));
   warn(`max iterations (${maxIter}) reached`);
   process.exit(1);
 }
