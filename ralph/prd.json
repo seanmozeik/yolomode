@@ -186,8 +186,8 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TDD: wrote 11 failing tests first (newline-split, multi-line chunk, empty chunk no-op, no trailing newline, buffer under 5500 not trimmed, buffer over 5500 trimmed to cap with oldest dropped, immutability). Implemented manageBuffer() in src/watch/utils/logBuffer.ts as a pure function using hysteresis trim (trim at cap+500, slice to cap). All 11 bun tests pass, typecheck clean."
     },
     {
       "id": "US-012",
