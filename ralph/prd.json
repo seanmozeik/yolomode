@@ -224,8 +224,8 @@
       ],
       "description": "Create src/watch/components/AgentTerminal.tsx — read-only log viewer with autoscroll, pause, and keyboard navigation. Wire as center column in the three-panel flex layout (flexGrow={1} center, flexGrow={2} right). Adapt opendocker's packages/cli/src/components/panes/container/logs.tsx for the component shape. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-002 and US-003.",
       "id": "US-013",
-      "notes": "",
-      "passes": false,
+      "notes": "Created src/watch/components/AgentTerminal.tsx using useLogStream(app.activeSession). Renders lines in <scrollbox> with stickyScroll autoscroll (stickyStart=bottom); s toggles pause with dim indicator; u/d scroll half terminal height; Home/End jump top/bottom. Panel header shows active session name; null session shows 'Select a session ↑↓ Enter' placeholder. Wired as center column (flexGrow=1) in cmd-watch.tsx; right panel retains flexGrow=2. onCleanup for Bun.spawn handled by useLogStream internals. Typecheck passes, 106 bun tests pass.",
+      "passes": true,
       "priority": 13,
       "title": "Build AgentTerminal.tsx and wire into center panel"
     },
