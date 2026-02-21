@@ -1,7 +1,7 @@
 import { useKeyboard } from '@opentui/solid';
 import { useDialog, useDialogKeyboard } from '@opentui-ui/dialog/solid';
 import pc from 'picocolors';
-import { type Accessor, createMemo, createSignal, For, Show } from 'solid-js';
+import { type Accessor, createMemo, createRenderEffect, createSignal, For, Show } from 'solid-js';
 import { useApp } from '../context/app';
 import { type DiffFile, listChangedFiles } from '../docker';
 import { getFileIcon } from '../ui/icons';
@@ -16,6 +16,10 @@ export interface FileListProps {
   showAll?: boolean;
   selectedFile?: Accessor<string | null>;
   onSelectFile?: (path: string) => void;
+  /** Increment to trigger a re-fetch of the file list */
+  refreshTrigger?: Accessor<number>;
+  /** Called after each successful file list fetch */
+  onFilesLoaded?: (files: DiffFile[]) => void;
 }
 
 function statusBadge(status: TreeNode['status']): string {
@@ -52,12 +56,16 @@ export function FileList(props: FileListProps) {
     try {
       const result = await listChangedFiles(sessionId, showAll());
       setFiles(result);
+      props.onFilesLoaded?.(result);
     } finally {
       setLoading(false);
     }
   };
 
-  loadFiles();
+  createRenderEffect(() => {
+    props.refreshTrigger?.(); // subscribe so re-runs on increment
+    loadFiles();
+  });
 
   // Regular files first, noisy files at bottom when showAll=true
   const orderedFiles = createMemo<DiffFile[]>(() => {
