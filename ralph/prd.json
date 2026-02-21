@@ -63,8 +63,8 @@
         "AppProvider wraps all panels in cmd-watch.tsx (replace the minimal stub's root element)",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created src/watch/context/app.tsx with AppProvider and useApp() using Solid.js createContext/createSignal. Store shape: sessions, activeSession, activePane, leftPanelOpen, rightPanelOpen with setters. AppProvider wraps root element in cmd-watch.tsx. Typecheck passes."
     },
     {
       "id": "US-005",
