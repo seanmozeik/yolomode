@@ -222,7 +222,7 @@ RUN VERSION=$(ls /opt/claude/versions/) \
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
-COPY ralph.sh /usr/local/bin/ralph
+COPY ralph.ts /usr/local/bin/ralph
 RUN chmod +x /usr/local/bin/ralph
 
 USER yolo

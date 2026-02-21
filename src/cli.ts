@@ -13,7 +13,7 @@ import DOCKERFILE from '../Dockerfile' with { type: 'text' };
 import ENTRYPOINT from '../entrypoint.sh' with { type: 'text' };
 import { cmdApply } from './cmd-apply';
 import { cmdForward } from './cmd-forward';
-import { cmdRalph, RALPH_SH } from './cmd-ralph';
+import { cmdRalph, RALPH } from './cmd-ralph';
 import { cmdRun } from './cmd-run';
 import { cmdCompletions } from './completions';
 import { BANNER, FORWARDS_DIR, HOME, IMAGE } from './constants';
@@ -128,7 +128,7 @@ try {
         await writeFile(join(ctx, 'entrypoint.sh'), ENTRYPOINT, {
           mode: 0o755
         });
-        await writeFile(join(ctx, 'ralph.sh'), RALPH_SH, {
+        await writeFile(join(ctx, 'ralph.ts'), RALPH, {
           mode: 0o755
         });
         await writeFile(join(ctx, 'starship.toml'), STARSHIP);

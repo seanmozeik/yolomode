@@ -1,0 +1,87 @@
+#!/usr/bin/env bun
+// ralph - autonomous PRD-driven development loop
+// Reads prd.json, picks highest-priority incomplete story, implements, tests, commits.
+// Repeats until all stories are complete or max iterations reached.
+//
+// Usage: ralph <claude|codex> [--max-iterations N] [-- <agent args...>]
+
+const PROMPT =
+  'Read prd.json in the current directory. Find the highest-priority story with status "pending". Set its status to "in_progress" and save prd.json. Then implement the story fully: write the code, run any available tests, typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update prd.json to set the story status to "complete" and commit that change too. If ALL stories already have status "complete", output exactly <promise>COMPLETE</promise> and do nothing else.';
+
+const argv = process.argv.slice(2);
+
+const agent = argv[0];
+if (!agent || (agent !== 'claude' && agent !== 'codex')) {
+  console.error('usage: ralph <claude|codex> [--max-iterations N] [-- <agent args...>]');
+  process.exit(1);
+}
+
+let maxIter = parseInt(process.env.RALPH_MAX_ITERATIONS ?? '10', 10);
+let extraArgs: string[] = [];
+let i = 1;
+
+while (i < argv.length) {
+  if (argv[i] === '--max-iterations') {
+    i++;
+    if (i >= argv.length) {
+      console.error('error: --max-iterations requires a value');
+      process.exit(1);
+    }
+    maxIter = parseInt(argv[i], 10);
+    i++;
+  } else if (argv[i] === '--') {
+    extraArgs = argv.slice(i + 1);
+    break;
+  } else {
+    console.error(`error: unknown argument: ${argv[i]}`);
+    process.exit(1);
+  }
+}
+
+if (isNaN(maxIter) || maxIter < 1) {
+  console.error('error: max iterations must be a positive integer');
+  process.exit(1);
+}
+
+console.log(`ralph: starting with ${agent} (max ${maxIter} iterations)\n`);
+
+for (let iter = 1; iter <= maxIter; iter++) {
+  console.log(`=========================================`);
+  console.log(`ralph: iteration ${iter}/${maxIter}`);
+  console.log(`=========================================\n`);
+
+  const agentCmd =
+    agent === 'claude'
+      ? ['claude', '--dangerously-skip-permissions', '--print', ...extraArgs, PROMPT]
+      : ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', ...extraArgs, PROMPT];
+
+  const proc = Bun.spawn(agentCmd, {
+    stderr: 'inherit',
+    stdout: 'pipe'
+  });
+
+  let output = '';
+  const reader = proc.stdout.getReader();
+  const decoder = new TextDecoder();
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    output += chunk;
+    process.stdout.write(chunk);
+  }
+  await proc.exited;
+
+  if (output.includes('<promise>COMPLETE</promise>')) {
+    console.log('\nralph: all stories complete!');
+    process.exit(0);
+  }
+
+  if (iter < maxIter) {
+    await Bun.sleep(2000);
+  }
+}
+
+console.log(`\nralph: max iterations (${maxIter}) reached without completing all stories`);
+console.log('ralph: check prd.json for status');
+process.exit(1);
