@@ -1,13 +1,9 @@
 {
-  "project": "yolomode watch TUI",
   "branchName": "ralph/watch-tui",
   "description": "Full-screen TUI session monitor (`yolomode watch`) — three-panel layout with session picker (left), agent log viewer (center), and diff panel (right). Built with @opentui/core + @opentui/solid (Solid.js), adapting opendocker's container streaming and critique's diff renderer. Red-green TDD with bun test is mandated for all non-UI, non-framework logic: write failing tests first, then implement to pass. Full spec: tasks/prd-watch.md. Epic specs: tasks/prd-watch-epic-1-foundation.md through tasks/prd-watch-epic-5-help-bar.md.",
+  "project": "yolomode watch TUI",
   "userStories": [
     {
-      "id": "US-001",
-      "title": "Install opentui, Solid.js, and opentui-ui packages",
-      "description": "Install @opentui/core, @opentui/solid, solid-js, @opentui-ui/dialog, and @opentui-ui/toast as production dependencies and configure tsconfig.json for Solid.js JSX. Full spec: tasks/prd-watch-epic-1-foundation.md US-001.",
-      "priority": 1,
       "acceptanceCriteria": [
         "Run `bun add @opentui/core @opentui/solid solid-js` — all appear in package.json dependencies",
         "Run `bun add @opentui-ui/dialog @opentui-ui/toast` — all appear in package.json dependencies",
@@ -15,14 +11,14 @@
         "tsconfig.json updated with `\"jsx\": \"preserve\"` and `\"jsxImportSource\": \"solid-js\"`",
         "Typecheck passes"
       ],
+      "description": "Install @opentui/core, @opentui/solid, solid-js, @opentui-ui/dialog, and @opentui-ui/toast as production dependencies and configure tsconfig.json for Solid.js JSX. Full spec: tasks/prd-watch-epic-1-foundation.md US-001.",
+      "id": "US-001",
+      "notes": "Installed @opentui/core@0.1.80, @opentui/solid@0.1.80, solid-js@1.9.11, @opentui-ui/dialog@0.1.2, @opentui-ui/toast@0.0.5. tsconfig.json configured with jsx: preserve and jsxImportSource: solid-js. Typecheck passes.",
       "passes": true,
-      "notes": "Installed @opentui/core@0.1.80, @opentui/solid@0.1.80, solid-js@1.9.11, @opentui-ui/dialog@0.1.2, @opentui-ui/toast@0.0.5. tsconfig.json configured with jsx: preserve and jsxImportSource: solid-js. Typecheck passes."
+      "priority": 1,
+      "title": "Install opentui, Solid.js, and opentui-ui packages"
     },
     {
-      "id": "US-002",
-      "title": "Scaffold src/cmd-watch.tsx with minimal opentui app",
-      "description": "Create src/cmd-watch.tsx exporting `cmdWatch(args: string[]): Promise<void>`. Renders a single bordered box with 'yolomode watch', exits cleanly on q/Ctrl-C. Proves the opentui + Bun stack works before any real panels are built. Full spec and Bun/opentui patterns: tasks/prd-watch-epic-1-foundation.md US-002.",
-      "priority": 2,
       "acceptanceCriteria": [
         "src/cmd-watch.tsx exists and exports `export async function cmdWatch(args: string[]): Promise<void>`",
         "Renders a single `<box borderStyle=\"round\">` containing `<text>yolomode watch</text>`",
@@ -31,14 +27,14 @@
         "Terminal resize does not crash or produce corrupt output",
         "Typecheck passes"
       ],
+      "description": "Create src/cmd-watch.tsx exporting `cmdWatch(args: string[]): Promise<void>`. Renders a single bordered box with 'yolomode watch', exits cleanly on q/Ctrl-C. Proves the opentui + Bun stack works before any real panels are built. Full spec and Bun/opentui patterns: tasks/prd-watch-epic-1-foundation.md US-002.",
+      "id": "US-002",
+      "notes": "Created src/cmd-watch.tsx with cmdWatch() export. Renders bordered box via @opentui/solid render(). Uses useKeyboard for q-key exit and useRenderer().destroy() for clean teardown. exitOnCtrlC: true handles Ctrl-C. Changed jsxImportSource to @opentui/solid for correct JSX types (borderStyle='rounded'). Typecheck passes.",
       "passes": true,
-      "notes": "Created src/cmd-watch.tsx with cmdWatch() export. Renders bordered box via @opentui/solid render(). Uses useKeyboard for q-key exit and useRenderer().destroy() for clean teardown. exitOnCtrlC: true handles Ctrl-C. Changed jsxImportSource to @opentui/solid for correct JSX types (borderStyle='rounded'). Typecheck passes."
+      "priority": 2,
+      "title": "Scaffold src/cmd-watch.tsx with minimal opentui app"
     },
     {
-      "id": "US-003",
-      "title": "Wire watch command in cli.ts and set as default no-arg entry point",
-      "description": "Add `case 'watch':` to src/cli.ts dispatching to cmdWatch. Change the no-arg default to launch the TUI instead of showing help. Add watch to the help table. Full spec and code patterns: tasks/prd-watch-epic-1-foundation.md US-003.",
-      "priority": 3,
       "acceptanceCriteria": [
         "`import { cmdWatch } from \"./cmd-watch\"` added at top of src/cli.ts",
         "`case 'watch':` added to the switch, calls `await cmdWatch(args.slice(1))`",
@@ -47,14 +43,14 @@
         "`bun run src/cli.ts` (no args) launches the TUI; `bun run src/cli.ts --help` still shows help",
         "Typecheck passes"
       ],
+      "description": "Add `case 'watch':` to src/cli.ts dispatching to cmdWatch. Change the no-arg default to launch the TUI instead of showing help. Add watch to the help table. Full spec and code patterns: tasks/prd-watch-epic-1-foundation.md US-003.",
+      "id": "US-003",
+      "notes": "Added import for cmdWatch, case 'watch' dispatching to cmdWatch(args.slice(1)), default no-arg case calling cmdWatch([]), watch entry in help table as first command, and --help/-h/help handling. Typecheck passes.",
       "passes": true,
-      "notes": "Added import for cmdWatch, case 'watch' dispatching to cmdWatch(args.slice(1)), default no-arg case calling cmdWatch([]), watch entry in help table as first command, and --help/-h/help handling. Typecheck passes."
+      "priority": 3,
+      "title": "Wire watch command in cli.ts and set as default no-arg entry point"
     },
     {
-      "id": "US-004",
-      "title": "Create AppProvider Solid.js context for shared TUI state",
-      "description": "Create src/watch/context/app.tsx with a Solid.js context (createSimpleContext pattern from opendocker packages/cli/src/context/helper.tsx) storing session list, active session, panel focus, and panel visibility. Full spec and opendocker reference code paths: tasks/prd-watch-epic-2-session-picker.md US-001.",
-      "priority": 4,
       "acceptanceCriteria": [
         "src/watch/context/app.tsx created using createSimpleContext pattern",
         "Exports `AppProvider` component and `useApp()` hook",
@@ -63,14 +59,14 @@
         "AppProvider wraps all panels in cmd-watch.tsx (replace the minimal stub's root element)",
         "Typecheck passes"
       ],
+      "description": "Create src/watch/context/app.tsx with a Solid.js context (createSimpleContext pattern from opendocker packages/cli/src/context/helper.tsx) storing session list, active session, panel focus, and panel visibility. Full spec and opendocker reference code paths: tasks/prd-watch-epic-2-session-picker.md US-001.",
+      "id": "US-004",
+      "notes": "Created src/watch/context/app.tsx with AppProvider and useApp() using Solid.js createContext/createSignal. Store shape: sessions, activeSession, activePane, leftPanelOpen, rightPanelOpen with setters. AppProvider wraps root element in cmd-watch.tsx. Typecheck passes.",
       "passes": true,
-      "notes": "Created src/watch/context/app.tsx with AppProvider and useApp() using Solid.js createContext/createSignal. Store shape: sessions, activeSession, activePane, leftPanelOpen, rightPanelOpen with setters. AppProvider wraps root element in cmd-watch.tsx. Typecheck passes."
+      "priority": 4,
+      "title": "Create AppProvider Solid.js context for shared TUI state"
     },
     {
-      "id": "US-005",
-      "title": "TDD: listSessions() — fetch yolomode Docker containers (red-green)",
-      "description": "TDD: write failing bun tests first, then implement. `listSessions()` lists Docker containers with `ancestor=yolomode` filter returning id, name, status, uptime. Make the function injectable/mockable so tests run without a live Docker daemon. Full spec: tasks/prd-watch-epic-2-session-picker.md US-002.",
-      "priority": 5,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/docker.test.ts using bun:test — confirm they fail before implementing",
         "Tests cover: running+stopped containers both returned, sorted running-first then alphabetical within each group, leading slash stripped from name, empty array when no containers",
@@ -81,14 +77,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
+      "description": "TDD: write failing bun tests first, then implement. `listSessions()` lists Docker containers with `ancestor=yolomode` filter returning id, name, status, uptime. Make the function injectable/mockable so tests run without a live Docker daemon. Full spec: tasks/prd-watch-epic-2-session-picker.md US-002.",
+      "id": "US-005",
+      "notes": "TDD: wrote 7 failing tests first (running+stopped, sort order, slash stripping, empty array, field mapping, exited→stopped). Created src/watch/docker.ts with listSessions() using injectable CommandRunner for test mocking. Uses docker ps -a --filter ancestor=yolomode --format json. Session type exported. All tests pass, typecheck passes.",
       "passes": true,
-      "notes": "TDD: wrote 7 failing tests first (running+stopped, sort order, slash stripping, empty array, field mapping, exited→stopped). Created src/watch/docker.ts with listSessions() using injectable CommandRunner for test mocking. Uses docker ps -a --filter ancestor=yolomode --format json. Session type exported. All tests pass, typecheck passes."
+      "priority": 5,
+      "title": "TDD: listSessions() — fetch yolomode Docker containers (red-green)"
     },
     {
-      "id": "US-006",
-      "title": "Build SessionList.tsx and left panel with [ toggle and Tab focus cycling",
-      "description": "Create src/watch/components/SessionList.tsx rendering sessions with status indicators, j/k nav, Enter to switch active session, 1s auto-refresh. Wrap in a 30-col bordered left panel toggled by [. Tab cycles panel focus. Adapt opendocker's packages/cli/src/components/panes/container/list.tsx directly. Full spec: tasks/prd-watch-epic-2-session-picker.md US-003 and US-004.",
-      "priority": 6,
       "acceptanceCriteria": [
         "src/watch/components/SessionList.tsx created",
         "Renders sessions with status indicator (● green running / ○ dim stopped), session name, uptime string",
@@ -101,14 +97,14 @@
         "Main layout is a horizontal flex row: [left panel] [center placeholder] [right placeholder]",
         "Typecheck passes"
       ],
+      "description": "Create src/watch/components/SessionList.tsx rendering sessions with status indicators, j/k nav, Enter to switch active session, 1s auto-refresh. Wrap in a 30-col bordered left panel toggled by [. Tab cycles panel focus. Adapt opendocker's packages/cli/src/components/panes/container/list.tsx directly. Full spec: tasks/prd-watch-epic-2-session-picker.md US-003 and US-004.",
+      "id": "US-006",
+      "notes": "Created src/watch/components/SessionList.tsx with status indicators (● green running / ○ dim stopped), j/k/arrow nav, Enter to set active session, 1s auto-refresh with onCleanup. Updated cmd-watch.tsx: horizontal flex row layout with left panel (30-col bordered box, Show conditional on leftPanelOpen), center and right placeholders. [ toggles leftPanelOpen, Tab cycles activePane sessions→terminal→diff. Typecheck passes.",
       "passes": true,
-      "notes": "Created src/watch/components/SessionList.tsx with status indicators (● green running / ○ dim stopped), j/k/arrow nav, Enter to set active session, 1s auto-refresh with onCleanup. Updated cmd-watch.tsx: horizontal flex row layout with left panel (30-col bordered box, Show conditional on leftPanelOpen), center and right placeholders. [ toggles leftPanelOpen, Tab cycles activePane sessions→terminal→diff. Typecheck passes."
+      "priority": 6,
+      "title": "Build SessionList.tsx and left panel with [ toggle and Tab focus cycling"
     },
     {
-      "id": "US-007",
-      "title": "TDD: pure utilities — balanceDelimiters and detectFiletype (red-green)",
-      "description": "TDD: write failing bun tests first, then port. Both are pure TypeScript from remorses/critique — copy verbatim. balanceDelimiters from critique's src/balance-delimiters.ts fixes tree-sitter parsing of partial hunks. detectFiletype from critique's src/diff-utils.ts maps extensions to parser names. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-003.",
-      "priority": 7,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/utils.test.ts — confirm they fail before implementing",
         "balanceDelimiters tests: balanced braces pass through unchanged, unbalanced `{` gets `}` appended, empty string returns empty string",
@@ -118,14 +114,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
+      "description": "TDD: write failing bun tests first, then port. Both are pure TypeScript from remorses/critique — copy verbatim. balanceDelimiters from critique's src/balance-delimiters.ts fixes tree-sitter parsing of partial hunks. detectFiletype from critique's src/diff-utils.ts maps extensions to parser names. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-003.",
+      "id": "US-007",
+      "notes": "TDD: wrote 25 failing tests first (countDelimiter, balanceDelimiters balanced/unbalanced/python/empty, detectFiletype for 15 extensions). Ported balanceDelimiters from critique's src/balance-delimiters.ts (handles backtick/triple-quote balancing for tree-sitter) and detectFiletype from critique's src/diff-utils.ts (maps 30+ extensions to parser names). All bun tests pass, typecheck passes.",
       "passes": true,
-      "notes": "TDD: wrote 25 failing tests first (countDelimiter, balanceDelimiters balanced/unbalanced/python/empty, detectFiletype for 15 extensions). Ported balanceDelimiters from critique's src/balance-delimiters.ts (handles backtick/triple-quote balancing for tree-sitter) and detectFiletype from critique's src/diff-utils.ts (maps 30+ extensions to parser names). All bun tests pass, typecheck passes."
+      "priority": 7,
+      "title": "TDD: pure utilities — balanceDelimiters and detectFiletype (red-green)"
     },
     {
-      "id": "US-008",
-      "title": "TDD: directory tree builder functions — buildInternalTree, collapseNode, flattenTree (red-green)",
-      "description": "TDD: write failing bun tests first, then port critique's src/directory-tree.ts (pure TypeScript, no React). These functions build the collapsible file tree with ├── / └── connectors for the diff file list. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
-      "priority": 8,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/directoryTree.test.ts — confirm they fail before implementing",
         "Tests cover: single file at root, nested paths build correct hierarchy, single-child dirs collapsed, flattenTree produces ├── for non-last siblings and └── for last sibling, empty input returns empty array",
@@ -134,14 +130,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
+      "description": "TDD: write failing bun tests first, then port critique's src/directory-tree.ts (pure TypeScript, no React). These functions build the collapsible file tree with ├── / └── connectors for the diff file list. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
+      "id": "US-008",
+      "notes": "TDD: wrote 17 failing tests first (buildInternalTree: empty/single/nested/fileIndex/shared prefixes, collapseNode: file node/single-child chain/multi-child/deep chain/file-child stop, flattenTree: empty/connectors/single/nesting/collapse/metadata/prefix). Ported buildInternalTree, collapseNode, flattenTree from critique's src/directory-tree.ts. FileStatus uses M/A/D/R to match git diff output. All bun tests pass, typecheck passes.",
       "passes": true,
-      "notes": "TDD: wrote 17 failing tests first (buildInternalTree: empty/single/nested/fileIndex/shared prefixes, collapseNode: file node/single-child chain/multi-child/deep chain/file-child stop, flattenTree: empty/connectors/single/nesting/collapse/metadata/prefix). Ported buildInternalTree, collapseNode, flattenTree from critique's src/directory-tree.ts. FileStatus uses M/A/D/R to match git diff output. All bun tests pass, typecheck passes."
+      "priority": 8,
+      "title": "TDD: directory tree builder functions — buildInternalTree, collapseNode, flattenTree (red-green)"
     },
     {
-      "id": "US-009",
-      "title": "TDD: noisy-file filter pure function — isNoisyFile (red-green)",
-      "description": "TDD: write failing bun tests first, then implement. Extract the noisy-file blocklist from tasks/prd-watch.md FR-5 as a pure exported function `isNoisyFile(path)`. Used by listChangedFiles() to filter lockfiles, build artifacts, sourcemaps, etc. Full blocklist: tasks/prd-watch.md FR-5.",
-      "priority": 9,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/noisyFilter.test.ts — confirm they fail before implementing",
         "Tests cover all blocklist patterns from tasks/prd-watch.md FR-5: bun.lock, package-lock.json, yarn.lock, pnpm-lock.yaml, Cargo.lock, *.min.js, *.min.css, *.map, dist/**, build/**, __pycache__/**, .next/**, *.pyc, .DS_Store, *.snap",
@@ -151,14 +147,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
+      "description": "TDD: write failing bun tests first, then implement. Extract the noisy-file blocklist from tasks/prd-watch.md FR-5 as a pure exported function `isNoisyFile(path)`. Used by listChangedFiles() to filter lockfiles, build artifacts, sourcemaps, etc. Full blocklist: tasks/prd-watch.md FR-5.",
+      "id": "US-009",
+      "notes": "TDD: wrote 27 failing tests first (exact lockfiles, glob extensions *.min.js/*.min.css/*.map/*.pyc/.DS_Store/*.snap, directory globs dist/**/build/**/__pycache__/**/.next/**, NOT noisy for regular source files). Created src/watch/utils/noisyFilter.ts with isNoisyFile() using minimatch@10.2.2 for glob pattern matching against PRD FR-5 blocklist. All bun tests pass, typecheck passes.",
       "passes": true,
-      "notes": "TDD: wrote 27 failing tests first (exact lockfiles, glob extensions *.min.js/*.min.css/*.map/*.pyc/.DS_Store/*.snap, directory globs dist/**/build/**/__pycache__/**/.next/**, NOT noisy for regular source files). Created src/watch/utils/noisyFilter.ts with isNoisyFile() using minimatch@10.2.2 for glob pattern matching against PRD FR-5 blocklist. All bun tests pass, typecheck passes."
+      "priority": 9,
+      "title": "TDD: noisy-file filter pure function — isNoisyFile (red-green)"
     },
     {
-      "id": "US-010",
-      "title": "Implement listChangedFiles() in src/watch/docker.ts",
-      "description": "Extend src/watch/docker.ts with `listChangedFiles(sessionId, showAll)`. Runs `git diff --name-status yolomode-base` via docker exec, parses M/A/D/R status, fetches mtime for each file in parallel (max 20 concurrent), sorts by mtime descending, filters noisy files via isNoisyFile(). Full spec: tasks/prd-watch-epic-4-diff-panel.md US-001.",
-      "priority": 10,
       "acceptanceCriteria": [
         "src/watch/docker.ts extended with `export async function listChangedFiles(sessionId: string, showAll: boolean): Promise<DiffFile[]>`",
         "DiffFile type exported: `{ status: 'M' | 'A' | 'D' | 'R'; path: string; oldPath?: string; mtime: number; noisy: boolean }`",
@@ -170,14 +166,14 @@
         "Returns empty array (not error) when yolomode-base branch does not exist in container",
         "Typecheck passes"
       ],
+      "description": "Extend src/watch/docker.ts with `listChangedFiles(sessionId, showAll)`. Runs `git diff --name-status yolomode-base` via docker exec, parses M/A/D/R status, fetches mtime for each file in parallel (max 20 concurrent), sorts by mtime descending, filters noisy files via isNoisyFile(). Full spec: tasks/prd-watch-epic-4-diff-panel.md US-001.",
+      "id": "US-010",
+      "notes": "TDD: wrote 10 failing tests first (M/A/D parsing, R100/R095 renames with oldPath, mtime descending sort, alphabetical tiebreaker, noisy exclusion showAll=false, noisy inclusion showAll=true, empty output, sessionId passthrough). Extended src/watch/docker.ts with listChangedFiles() and DiffFile type. Uses injectable CommandRunner for test mocking. Manual batching for max 20 concurrent stat calls. All 87 bun tests pass, typecheck passes.",
       "passes": true,
-      "notes": "TDD: wrote 10 failing tests first (M/A/D parsing, R100/R095 renames with oldPath, mtime descending sort, alphabetical tiebreaker, noisy exclusion showAll=false, noisy inclusion showAll=true, empty output, sessionId passthrough). Extended src/watch/docker.ts with listChangedFiles() and DiffFile type. Uses injectable CommandRunner for test mocking. Manual batching for max 20 concurrent stat calls. All 87 bun tests pass, typecheck passes."
+      "priority": 10,
+      "title": "Implement listChangedFiles() in src/watch/docker.ts"
     },
     {
-      "id": "US-011",
-      "title": "TDD: log buffer management pure function — manageBuffer (red-green)",
-      "description": "TDD: write failing bun tests first, then implement. Extract buffer management from the log streaming hook as pure function `manageBuffer(lines, newChunk, cap)`. Splits chunks into lines, appends, trims to 5000 when over 5500. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-001.",
-      "priority": 11,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/logBuffer.test.ts — confirm they fail before implementing",
         "Tests cover: newline-split chunk appended correctly, buffer under 5500 not trimmed, buffer over 5500 trimmed to 5000 (oldest dropped), empty chunk returns lines unchanged, chunk with no trailing newline handled",
@@ -186,14 +182,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "TDD: write failing bun tests first, then implement. Extract buffer management from the log streaming hook as pure function `manageBuffer(lines, newChunk, cap)`. Splits chunks into lines, appends, trims to 5000 when over 5500. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-001.",
+      "id": "US-011",
+      "notes": "TDD: wrote 11 failing tests first (newline-split, multi-line chunk, empty chunk no-op, no trailing newline, buffer under 5500 not trimmed, buffer over 5500 trimmed to cap with oldest dropped, immutability). Implemented manageBuffer() in src/watch/utils/logBuffer.ts as a pure function using hysteresis trim (trim at cap+500, slice to cap). All 11 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 11,
+      "title": "TDD: log buffer management pure function — manageBuffer (red-green)"
     },
     {
-      "id": "US-012",
-      "title": "Create useLogStream.ts — reactive docker log streaming hook",
-      "description": "Create src/watch/hooks/useLogStream.ts as a Solid.js hook. Streams `docker logs --follow --tail 200` for the active session using Bun.spawn. Uses manageBuffer() from US-011. Restarts when sessionId changes. Adapt opendocker's packages/cli/src/components/panes/container/logs.tsx. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-001.",
-      "priority": 12,
       "acceptanceCriteria": [
         "src/watch/hooks/useLogStream.ts created",
         "Accepts `sessionId: Accessor<string | null>` (reactive Solid accessor)",
@@ -206,14 +202,14 @@
         "5000-line buffer cap enforced via manageBuffer (trim triggered at 5500)",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/hooks/useLogStream.ts as a Solid.js hook. Streams `docker logs --follow --tail 200` for the active session using Bun.spawn. Uses manageBuffer() from US-011. Restarts when sessionId changes. Adapt opendocker's packages/cli/src/components/panes/container/logs.tsx. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-001.",
+      "id": "US-012",
+      "notes": "TDD: wrote 8 tests first (null sessionId no-spawn, spawn with correct id, stdout accumulation, stderr accumulation, merged streams, clearLines reset, kill on dispose, empty initial lines). Created src/watch/hooks/useLogStream.ts with SpawnFn injectable interface. Uses createRenderEffect (createEffect is a no-op in Bun's server build of solid-js). Streams docker logs --follow --tail 200 via Bun.spawn, merges stdout+stderr via parallel readStream loops, caps buffer at 5000 lines via manageBuffer(), kills process on onCleanup. All 106 bun tests pass, typecheck passes.",
+      "passes": true,
+      "priority": 12,
+      "title": "Create useLogStream.ts — reactive docker log streaming hook"
     },
     {
-      "id": "US-013",
-      "title": "Build AgentTerminal.tsx and wire into center panel",
-      "description": "Create src/watch/components/AgentTerminal.tsx — read-only log viewer with autoscroll, pause, and keyboard navigation. Wire as center column in the three-panel flex layout (flexGrow={1} center, flexGrow={2} right). Adapt opendocker's packages/cli/src/components/panes/container/logs.tsx for the component shape. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-002 and US-003.",
-      "priority": 13,
       "acceptanceCriteria": [
         "src/watch/components/AgentTerminal.tsx created",
         "Uses useLogStream(app.activeSession) from US-012; renders lines in a scrollbox with ANSI codes preserved",
@@ -226,28 +222,28 @@
         "Root onCleanup kills all Bun.spawn processes spawned by useLogStream",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/components/AgentTerminal.tsx — read-only log viewer with autoscroll, pause, and keyboard navigation. Wire as center column in the three-panel flex layout (flexGrow={1} center, flexGrow={2} right). Adapt opendocker's packages/cli/src/components/panes/container/logs.tsx for the component shape. Full spec: tasks/prd-watch-epic-3-agent-terminal.md US-002 and US-003.",
+      "id": "US-013",
+      "notes": "Created src/watch/components/AgentTerminal.tsx using useLogStream(app.activeSession). Renders lines in <scrollbox> with stickyScroll autoscroll (stickyStart=bottom); s toggles pause with dim indicator; u/d scroll half terminal height; Home/End jump top/bottom. Panel header shows active session name; null session shows 'Select a session ↑↓ Enter' placeholder. Wired as center column (flexGrow=1) in cmd-watch.tsx; right panel retains flexGrow=2. onCleanup for Bun.spawn handled by useLogStream internals. Typecheck passes, 106 bun tests pass.",
+      "passes": true,
+      "priority": 13,
+      "title": "Build AgentTerminal.tsx and wire into center panel"
     },
     {
-      "id": "US-014",
-      "title": "Create src/watch/ui/icons.ts — Nerd Font file icon lookup table",
-      "description": "Create a lookup table mapping file extensions to Nerd Font icon characters and a getFileIcon(filename) helper. Sourced from the nvim-web-devicons icon set (yazi-style). Used by FileList to show file-type icons. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
-      "priority": 14,
       "acceptanceCriteria": [
         "src/watch/ui/icons.ts created",
         "Exports `FILE_ICONS: Record<string, string>` with Nerd Font chars for: .ts, .tsx, .js, .jsx, .json, .md, .sh, .toml, .yaml, .yml, .css, .scss, .html, .py, .rs, .go, .lock",
         "Exports `getFileIcon(filename: string): string` — strips path, extracts extension, returns icon or '' fallback for unknowns",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create a lookup table mapping file extensions to Nerd Font icon characters and a getFileIcon(filename) helper. Sourced from the nvim-web-devicons icon set (yazi-style). Used by FileList to show file-type icons. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
+      "id": "US-014",
+      "notes": "TDD: wrote 27 failing tests first (FILE_ICONS entries for all 17 required extensions, getFileIcon path-stripping, extension extraction, unknown extension fallback '', dotfiles, empty string). Created src/watch/ui/icons.ts with FILE_ICONS lookup table and getFileIcon() using node:path extname/basename. All 133 bun tests pass, typecheck passes.",
+      "passes": true,
+      "priority": 14,
+      "title": "Create src/watch/ui/icons.ts — Nerd Font file icon lookup table"
     },
     {
-      "id": "US-015",
-      "title": "Build FileList.tsx — changed files tree with status badges and Ctrl+P fuzzy finder",
-      "description": "Create src/watch/components/FileList.tsx rendering changed files as a collapsible tree via buildInternalTree→collapseNode→flattenTree. Shows Nerd Font icon, git status badge (M/A/D/R), filename. j/k nav, Enter to select, Ctrl+P fuzzy finder via @opentui-ui/dialog. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
-      "priority": 15,
       "acceptanceCriteria": [
         "src/watch/components/FileList.tsx created",
         "Calls listChangedFiles(app.activeSession(), showAll) and renders via buildInternalTree → collapseNode → flattenTree",
@@ -258,14 +254,14 @@
         "Empty state renders 'No changes yet'",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/components/FileList.tsx rendering changed files as a collapsible tree via buildInternalTree→collapseNode→flattenTree. Shows Nerd Font icon, git status badge (M/A/D/R), filename. j/k nav, Enter to select, Ctrl+P fuzzy finder via @opentui-ui/dialog. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
+      "id": "US-015",
+      "notes": "Created src/watch/components/FileList.tsx with collapsible tree via buildInternalTree→flattenTree. Status badges M yellow/A green/D red/R cyan, Nerd Font icons via getFileIcon(). j/k nav when activePane==='diff', Enter calls onSelectFile prop. Ctrl+P opens @opentui-ui/dialog prompt with live substring filter, j/k/backspace navigation, Enter to select. Noisy files dimmed at bottom when showAll=true, hidden when showAll=false. Empty state 'No changes yet'. Added DialogProvider wrapper to cmd-watch.tsx App. 133 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 15,
+      "title": "Build FileList.tsx — changed files tree with status badges and Ctrl+P fuzzy finder"
     },
     {
-      "id": "US-016",
-      "title": "Build DiffView.tsx — syntax-highlighted diff with opentui <diff> element",
-      "description": "Create src/watch/components/DiffView.tsx. Fetches `git diff yolomode-base -- <file>` via docker exec, preprocesses with balanceDelimiters(), renders with opentui's <diff> element using detectFiletype(). Handles u/d scroll, f full-panel toggle, dirty indicator. Port React hooks to Solid. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-003.",
-      "priority": 16,
       "acceptanceCriteria": [
         "src/watch/components/DiffView.tsx created",
         "Fetches `docker exec <id> git -C /workspace diff yolomode-base -- <path>` when selectedFile changes",
@@ -276,14 +272,14 @@
         "Shows `[● updated]` in header when diff refreshes after a file change; spinner while fetching; 'Select a file' when none selected",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/components/DiffView.tsx. Fetches `git diff yolomode-base -- <file>` via docker exec, preprocesses with balanceDelimiters(), renders with opentui's <diff> element using detectFiletype(). Handles u/d scroll, f full-panel toggle, dirty indicator. Port React hooks to Solid. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-003.",
+      "id": "US-016",
+      "notes": "Created src/watch/components/DiffView.tsx: fetches git diff yolomode-base -- <file> via docker exec (piped I/O), preprocesses with balanceDelimiters(), renders via opentui <diff view=\"unified\" filetype={detectFiletype(path)} wrapMode=\"word\" />. u/d scroll via scrollbox ref; f key fires onToggleFull prop callback. Loading spinner while fetching, [● updated] indicator when diff content changes, 'Select a file' fallback when no file selected. Uses createRenderEffect (createEffect is no-op in opentui Bun build). 133 bun tests pass, typecheck passes.",
+      "passes": true,
+      "priority": 16,
+      "title": "Build DiffView.tsx — syntax-highlighted diff with opentui <diff> element"
     },
     {
-      "id": "US-017",
-      "title": "TDD: file list change detection — haveFilesChanged (red-green)",
-      "description": "TDD: write failing bun tests first, then implement. Pure function `haveFilesChanged(prev, next)` used by useDirtyPoller to detect when new files are changed in the container without triggering re-renders. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
-      "priority": 17,
       "acceptanceCriteria": [
         "TDD: write failing tests FIRST in src/watch/__tests__/fileListDiff.test.ts — confirm they fail before implementing",
         "Tests cover: identical lists return false, added file returns true, removed file returns true, same files different order returns false (order-independent), empty vs non-empty returns true, both empty returns false",
@@ -292,14 +288,14 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "TDD: write failing bun tests first, then implement. Pure function `haveFilesChanged(prev, next)` used by useDirtyPoller to detect when new files are changed in the container without triggering re-renders. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
+      "id": "US-017",
+      "notes": "TDD: wrote 7 failing tests first (identical lists, added file, removed file, same files different order, empty→non-empty, non-empty→empty, both empty). Implemented pure haveFilesChanged() in src/watch/utils/fileListDiff.ts — sorts both arrays before comparing so order differences don't trigger false positives. 140 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 17,
+      "title": "TDD: file list change detection — haveFilesChanged (red-green)"
     },
     {
-      "id": "US-018",
-      "title": "Create useDirtyPoller.ts — 3s background poll for new changed files",
-      "description": "Create src/watch/hooks/useDirtyPoller.ts as a Solid.js hook. Polls every 3s via docker exec, uses haveFilesChanged() from US-017, returns a dirty signal. Never auto-rerenders panels. Pauses when right panel is closed. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
-      "priority": 18,
       "acceptanceCriteria": [
         "src/watch/hooks/useDirtyPoller.ts created",
         "Accepts `sessionId: Accessor<string | null>` and `rightPanelOpen: Accessor<boolean>`",
@@ -311,14 +307,14 @@
         "onCleanup clears the setInterval",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/hooks/useDirtyPoller.ts as a Solid.js hook. Polls every 3s via docker exec, uses haveFilesChanged() from US-017, returns a dirty signal. Never auto-rerenders panels. Pauses when right panel is closed. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
+      "id": "US-018",
+      "notes": "TDD: wrote 10 failing tests first (null sessionId no-exec, rightPanelOpen=false no-exec, sessionId passthrough, first poll establishes baseline without dirty, file change sets dirty=true, unchanged files keep dirty=false, clearDirty resets, clearDirty+stable list stays false, onCleanup clears interval). Implemented useDirtyPoller() in src/watch/hooks/useDirtyPoller.ts with injectable ExecFn interface. Uses setInterval checking sessionId() and rightPanelOpen() on each tick; null-baseline pattern skips dirty on first poll; haveFilesChanged() from US-017 drives detection. All 150 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 18,
+      "title": "Create useDirtyPoller.ts — 3s background poll for new changed files"
     },
     {
-      "id": "US-019",
-      "title": "Build DiffPanel.tsx — right panel with ] toggle, dirty indicator, and r refresh",
-      "description": "Create src/watch/components/DiffPanel.tsx containing FileList above DiffView with a horizontal divider. ] toggles the panel. Dirty indicator in header when useDirtyPoller fires. r refreshes file list and clears dirty. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-005.",
-      "priority": 19,
       "acceptanceCriteria": [
         "src/watch/components/DiffPanel.tsx created with <FileList /> stacked above <DiffView /> separated by a divider",
         "] keypress toggles app.rightPanelOpen; panel uses `<Show when={app.rightPanelOpen()}>`",
@@ -328,14 +324,14 @@
         "useDirtyPoller wired into DiffPanel; passes app.rightPanelOpen so polling pauses when panel is closed",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/components/DiffPanel.tsx containing FileList above DiffView with a horizontal divider. ] toggles the panel. Dirty indicator in header when useDirtyPoller fires. r refreshes file list and clears dirty. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-005.",
+      "id": "US-019",
+      "notes": "Created src/watch/components/DiffPanel.tsx: stacks FileList above DiffView with a dim horizontal divider, wires useDirtyPoller to show [● new changes — r] in header, r refreshes file list with selection preservation (falls back to first file), f toggles full-diff mode (collapses FileList). Panel width = Math.floor(terminalWidth * 0.4). Extended FileList with refreshTrigger/onFilesLoaded props via createRenderEffect. Added ] global keybinding in cmd-watch.tsx to toggle rightPanelOpen; replaced placeholder with <Show when={app.rightPanelOpen()}><DiffPanel /></Show>. 150 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 19,
+      "title": "Build DiffPanel.tsx — right panel with ] toggle, dirty indicator, and r refresh"
     },
     {
-      "id": "US-020",
-      "title": "Build HelpBar.tsx and wire into main layout as fixed bottom row",
-      "description": "Create src/watch/components/HelpBar.tsx — a dim 1-line keybinding reference bar. Wire as the last row in the root column flex in cmd-watch.tsx. Also wire all global keybindings (q exit, [ left, ] right, Tab focus). Adapt opendocker's packages/cli/src/components/footer.tsx. Full spec: tasks/prd-watch-epic-5-help-bar.md.",
-      "priority": 20,
       "acceptanceCriteria": [
         "src/watch/components/HelpBar.tsx created",
         "Renders exactly 1 line: `[ left  ] right  Tab focus  j/k nav  r refresh  s scroll  p ports  q quit`",
@@ -346,8 +342,12 @@
         "Global keybindings wired in root component: q exits TUI cleanly (restores terminal), [ toggles leftPanelOpen, ] toggles rightPanelOpen, Tab cycles app.activePane",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "description": "Create src/watch/components/HelpBar.tsx — a dim 1-line keybinding reference bar. Wire as the last row in the root column flex in cmd-watch.tsx. Also wire all global keybindings (q exit, [ left, ] right, Tab focus). Adapt opendocker's packages/cli/src/components/footer.tsx. Full spec: tasks/prd-watch-epic-5-help-bar.md.",
+      "id": "US-020",
+      "notes": "Created src/watch/components/HelpBar.tsx rendering the static keybinding reference line ([ left  ] right  Tab focus  j/k nav  r refresh  s scroll  p ports  q quit) styled with picocolors.dim(). Fixed height={1}, paddingX={1}. Updated cmd-watch.tsx WatchLayout to column flex: panel row (flexGrow=1) above, HelpBar (height=1) pinned at bottom. Global keybindings (q/[/]/Tab) were already wired. 150 bun tests pass, typecheck clean.",
+      "passes": true,
+      "priority": 20,
+      "title": "Build HelpBar.tsx and wire into main layout as fixed bottom row"
     }
   ]
 }
