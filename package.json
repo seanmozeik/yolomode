@@ -35,7 +35,7 @@
     "url": "git+https://github.com/seanmozeik/yolomode.git"
   },
   "scripts": {
-    "build": "bun build --compile src/cli.ts --outfile yolomode",
+    "build": "bun run scripts/build.ts compile",
     "bundle": "bun build ./src/cli.ts --outdir dist --target=bun --bytecode --minify",
     "check": "biome check --write --unsafe .",
     "dev": "bun run src/cli.ts",
