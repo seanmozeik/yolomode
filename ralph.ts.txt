@@ -5,6 +5,43 @@
 //
 // Usage: ralph <claude|codex> [--max-iterations N] [-- <agent args...>]
 
+// ── placeholder: replace with real ASCII art ──────────────────────────────────
+const BANNER = `
+ _ __ __ _ | |  _ __ | |__
+| '__/ _\` || | | '_ \\| '_ \\
+| | | (_| || | | |_) | | | |
+|_|  \\__,_||_| | .__/|_| |_|
+               |_|
+`;
+// ─────────────────────────────────────────────────────────────────────────────
+
+type RGB = [number, number, number];
+
+function hexToRgb(hex: string): RGB {
+  const n = parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+
+function gradientBanner(text: string, stops: string[]): string {
+  const colors = stops.map(hexToRgb);
+  const lines = text.replace(/^\n/, '').replace(/\n$/, '').split('\n');
+  return lines
+    .map((line, i) => {
+      const t = lines.length <= 1 ? 0 : i / (lines.length - 1);
+      const seg = Math.min(Math.floor(t * (colors.length - 1)), colors.length - 2);
+      const lt = t * (colors.length - 1) - seg;
+      const [r1, g1, b1] = colors[seg];
+      const [r2, g2, b2] = colors[seg + 1];
+      const r = Math.round(r1 + (r2 - r1) * lt);
+      const g = Math.round(g1 + (g2 - g1) * lt);
+      const b = Math.round(b1 + (b2 - b1) * lt);
+      return `\x1b[38;2;${r};${g};${b}m${line}\x1b[0m`;
+    })
+    .join('\n');
+}
+
+console.log(gradientBanner(BANNER, ['#ca9ee6', '#f4b8e4', '#babbf1']));
+
 const PROMPT =
   'Read prd.json in the current directory. Find the highest-priority story with status "pending". Set its status to "in_progress" and save prd.json. Then implement the story fully: write the code, run any available tests, typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update prd.json to set the story status to "complete" and commit that change too. If ALL stories already have status "complete", output exactly <promise>COMPLETE</promise> and do nothing else.';
 
