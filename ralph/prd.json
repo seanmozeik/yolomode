@@ -31,8 +31,8 @@
         "Terminal resize does not crash or produce corrupt output",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created src/cmd-watch.tsx with cmdWatch() export. Renders bordered box via @opentui/solid render(). Uses useKeyboard for q-key exit and useRenderer().destroy() for clean teardown. exitOnCtrlC: true handles Ctrl-C. Changed jsxImportSource to @opentui/solid for correct JSX types (borderStyle='rounded'). Typecheck passes."
     },
     {
       "id": "US-003",
