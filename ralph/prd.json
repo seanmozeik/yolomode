@@ -326,8 +326,8 @@
       ],
       "description": "Create src/watch/components/DiffPanel.tsx containing FileList above DiffView with a horizontal divider. ] toggles the panel. Dirty indicator in header when useDirtyPoller fires. r refreshes file list and clears dirty. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-005.",
       "id": "US-019",
-      "notes": "",
-      "passes": false,
+      "notes": "Created src/watch/components/DiffPanel.tsx: stacks FileList above DiffView with a dim horizontal divider, wires useDirtyPoller to show [● new changes — r] in header, r refreshes file list with selection preservation (falls back to first file), f toggles full-diff mode (collapses FileList). Panel width = Math.floor(terminalWidth * 0.4). Extended FileList with refreshTrigger/onFilesLoaded props via createRenderEffect. Added ] global keybinding in cmd-watch.tsx to toggle rightPanelOpen; replaced placeholder with <Show when={app.rightPanelOpen()}><DiffPanel /></Show>. 150 bun tests pass, typecheck clean.",
+      "passes": true,
       "priority": 19,
       "title": "Build DiffPanel.tsx — right panel with ] toggle, dirty indicator, and r refresh"
     },
