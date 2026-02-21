@@ -118,8 +118,8 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TDD: wrote 25 failing tests first (countDelimiter, balanceDelimiters balanced/unbalanced/python/empty, detectFiletype for 15 extensions). Ported balanceDelimiters from critique's src/balance-delimiters.ts (handles backtick/triple-quote balancing for tree-sitter) and detectFiletype from critique's src/diff-utils.ts (maps 30+ extensions to parser names). All bun tests pass, typecheck passes."
     },
     {
       "id": "US-008",
