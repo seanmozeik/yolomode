@@ -309,8 +309,8 @@
       ],
       "description": "Create src/watch/hooks/useDirtyPoller.ts as a Solid.js hook. Polls every 3s via docker exec, uses haveFilesChanged() from US-017, returns a dirty signal. Never auto-rerenders panels. Pauses when right panel is closed. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
       "id": "US-018",
-      "notes": "",
-      "passes": false,
+      "notes": "TDD: wrote 10 failing tests first (null sessionId no-exec, rightPanelOpen=false no-exec, sessionId passthrough, first poll establishes baseline without dirty, file change sets dirty=true, unchanged files keep dirty=false, clearDirty resets, clearDirty+stable list stays false, onCleanup clears interval). Implemented useDirtyPoller() in src/watch/hooks/useDirtyPoller.ts with injectable ExecFn interface. Uses setInterval checking sessionId() and rightPanelOpen() on each tick; null-baseline pattern skips dirty on first poll; haveFilesChanged() from US-017 drives detection. All 150 bun tests pass, typecheck clean.",
+      "passes": true,
       "priority": 18,
       "title": "Create useDirtyPoller.ts — 3s background poll for new changed files"
     },
