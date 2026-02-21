@@ -274,8 +274,8 @@
       ],
       "description": "Create src/watch/components/DiffView.tsx. Fetches `git diff yolomode-base -- <file>` via docker exec, preprocesses with balanceDelimiters(), renders with opentui's <diff> element using detectFiletype(). Handles u/d scroll, f full-panel toggle, dirty indicator. Port React hooks to Solid. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-003.",
       "id": "US-016",
-      "notes": "",
-      "passes": false,
+      "notes": "Created src/watch/components/DiffView.tsx: fetches git diff yolomode-base -- <file> via docker exec (piped I/O), preprocesses with balanceDelimiters(), renders via opentui <diff view=\"unified\" filetype={detectFiletype(path)} wrapMode=\"word\" />. u/d scroll via scrollbox ref; f key fires onToggleFull prop callback. Loading spinner while fetching, [● updated] indicator when diff content changes, 'Select a file' fallback when no file selected. Uses createRenderEffect (createEffect is no-op in opentui Bun build). 133 bun tests pass, typecheck passes.",
+      "passes": true,
       "priority": 16,
       "title": "Build DiffView.tsx — syntax-highlighted diff with opentui <diff> element"
     },
