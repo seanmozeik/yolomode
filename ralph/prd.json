@@ -15,8 +15,8 @@
         "tsconfig.json updated with `\"jsx\": \"preserve\"` and `\"jsxImportSource\": \"solid-js\"`",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Installed @opentui/core@0.1.80, @opentui/solid@0.1.80, solid-js@1.9.11, @opentui-ui/dialog@0.1.2, @opentui-ui/toast@0.0.5. tsconfig.json configured with jsx: preserve and jsxImportSource: solid-js. Typecheck passes."
     },
     {
       "id": "US-002",
