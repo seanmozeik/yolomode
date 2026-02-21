@@ -134,8 +134,8 @@
         "All bun tests pass",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TDD: wrote 17 failing tests first (buildInternalTree: empty/single/nested/fileIndex/shared prefixes, collapseNode: file node/single-child chain/multi-child/deep chain/file-child stop, flattenTree: empty/connectors/single/nesting/collapse/metadata/prefix). Ported buildInternalTree, collapseNode, flattenTree from critique's src/directory-tree.ts. FileStatus uses M/A/D/R to match git diff output. All bun tests pass, typecheck passes."
     },
     {
       "id": "US-009",
