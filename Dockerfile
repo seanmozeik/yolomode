@@ -170,14 +170,14 @@ RUN printf '%s\n' \
     'eval "$(starship init zsh)"' \
     '_ym_title() { printf "\033]0;ym-%s\007" "$HOST"; }' \
     'precmd_functions+=(_ym_title)' \
-    'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"' \
+    'alias cc="claude"' \
+    'alias co="codex"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
-    'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"' \
+    'alias cc="claude"' \
+    'alias co="codex"' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -189,8 +189,8 @@ RUN mkdir -p /home/yolo/.config/nushell \
     '$env.config.show_banner = false' \
     '$env.EDITOR = "micro"' \
     '$env.VISUAL = "micro"' \
-    'alias cc = claude --dangerously-skip-permissions' \
-    'alias co = codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen' \
+    'alias cc = claude' \
+    'alias co = codex' \
     'alias .. = cd ..' \
     >> /home/yolo/.config/nushell/config.nu \
     && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
@@ -207,7 +207,16 @@ RUN VERSION=$(ls /opt/claude/versions/) \
        /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
        /home/yolo/.local/bin /home/yolo/.local/share/claude/versions \
     && ln -s /opt/claude/versions/$VERSION /home/yolo/.local/share/claude/versions/$VERSION \
-    && ln -s /home/yolo/.local/share/claude/versions/$VERSION /home/yolo/.local/bin/claude \
+    && printf '%s\n' \
+       '#!/bin/sh' \
+       'exec /usr/local/bin/claude --dangerously-skip-permissions "$@"' \
+       > /home/yolo/.local/bin/claude \
+    && chmod +x /home/yolo/.local/bin/claude \
+    && printf '%s\n' \
+       '#!/bin/sh' \
+       'exec /usr/local/bun/bin/codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen "$@"' \
+       > /home/yolo/.local/bin/codex \
+    && chmod +x /home/yolo/.local/bin/codex \
     && chown -R yolo:yolo /home/yolo
 
 # Entrypoint
