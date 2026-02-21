@@ -1,5 +1,6 @@
 import type { KeyEvent } from '@opentui/core';
 import { render, useKeyboard, useRenderer } from '@opentui/solid';
+import { AppProvider } from './watch/context/app';
 
 function App() {
   const renderer = useRenderer();
@@ -11,9 +12,11 @@ function App() {
   });
 
   return (
-    <box borderStyle="rounded" paddingLeft={1} paddingRight={1}>
-      <text>yolomode watch</text>
-    </box>
+    <AppProvider>
+      <box borderStyle="rounded" paddingLeft={1} paddingRight={1}>
+        <text>yolomode watch</text>
+      </box>
+    </AppProvider>
   );
 }
 
