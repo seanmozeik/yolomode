@@ -258,6 +258,8 @@ export async function cmdRun(args: string[]): Promise<void> {
     '-e',
     'TERM',
     '-e',
+    'COLORTERM',
+    '-e',
     `COLUMNS=${cols}`,
     '-e',
     `LINES=${rows}`,

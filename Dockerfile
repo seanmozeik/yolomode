@@ -159,6 +159,8 @@ COPY --from=mise-tools /opt/cargo /opt/cargo
 RUN groupadd -g 1000 yolo && useradd -u 1000 -g yolo -d /home/yolo -s /usr/local/bin/nu -m yolo
 ENV HOME=/home/yolo
 ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
+# Default to truecolor — overridden at runtime by -e COLORTERM if host differs
+ENV COLORTERM=truecolor
 
 # Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
 RUN printf '%s\n' \
@@ -169,13 +171,13 @@ RUN printf '%s\n' \
     '_ym_title() { printf "\033]0;ym-%s\007" "$HOST"; }' \
     'precmd_functions+=(_ym_title)' \
     'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --dangerously-bypass-approvals-and-sandbox"' \
+    'alias co="codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
     'alias cc="claude --dangerously-skip-permissions"' \
-    'alias co="codex --dangerously-bypass-approvals-and-sandbox"' \
+    'alias co="codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen"' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -188,7 +190,7 @@ RUN mkdir -p /home/yolo/.config/nushell \
     '$env.EDITOR = "micro"' \
     '$env.VISUAL = "micro"' \
     'alias cc = claude --dangerously-skip-permissions' \
-    'alias co = codex --dangerously-bypass-approvals-and-sandbox' \
+    'alias co = codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen' \
     'alias .. = cd ..' \
     >> /home/yolo/.config/nushell/config.nu \
     && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
