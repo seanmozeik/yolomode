@@ -170,8 +170,8 @@
         "Returns empty array (not error) when yolomode-base branch does not exist in container",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "TDD: wrote 10 failing tests first (M/A/D parsing, R100/R095 renames with oldPath, mtime descending sort, alphabetical tiebreaker, noisy exclusion showAll=false, noisy inclusion showAll=true, empty output, sessionId passthrough). Extended src/watch/docker.ts with listChangedFiles() and DiffFile type. Uses injectable CommandRunner for test mocking. Manual batching for max 20 concurrent stat calls. All 87 bun tests pass, typecheck passes."
     },
     {
       "id": "US-011",
