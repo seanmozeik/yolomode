@@ -256,8 +256,8 @@
       ],
       "description": "Create src/watch/components/FileList.tsx rendering changed files as a collapsible tree via buildInternalTree→collapseNode→flattenTree. Shows Nerd Font icon, git status badge (M/A/D/R), filename. j/k nav, Enter to select, Ctrl+P fuzzy finder via @opentui-ui/dialog. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
       "id": "US-015",
-      "notes": "",
-      "passes": false,
+      "notes": "Created src/watch/components/FileList.tsx with collapsible tree via buildInternalTree→flattenTree. Status badges M yellow/A green/D red/R cyan, Nerd Font icons via getFileIcon(). j/k nav when activePane==='diff', Enter calls onSelectFile prop. Ctrl+P opens @opentui-ui/dialog prompt with live substring filter, j/k/backspace navigation, Enter to select. Noisy files dimmed at bottom when showAll=true, hidden when showAll=false. Empty state 'No changes yet'. Added DialogProvider wrapper to cmd-watch.tsx App. 133 bun tests pass, typecheck clean.",
+      "passes": true,
       "priority": 15,
       "title": "Build FileList.tsx — changed files tree with status badges and Ctrl+P fuzzy finder"
     },
