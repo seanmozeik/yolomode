@@ -238,8 +238,8 @@
       ],
       "description": "Create a lookup table mapping file extensions to Nerd Font icon characters and a getFileIcon(filename) helper. Sourced from the nvim-web-devicons icon set (yazi-style). Used by FileList to show file-type icons. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-002.",
       "id": "US-014",
-      "notes": "",
-      "passes": false,
+      "notes": "TDD: wrote 27 failing tests first (FILE_ICONS entries for all 17 required extensions, getFileIcon path-stripping, extension extraction, unknown extension fallback '', dotfiles, empty string). Created src/watch/ui/icons.ts with FILE_ICONS lookup table and getFileIcon() using node:path extname/basename. All 133 bun tests pass, typecheck passes.",
+      "passes": true,
       "priority": 14,
       "title": "Create src/watch/ui/icons.ts — Nerd Font file icon lookup table"
     },
