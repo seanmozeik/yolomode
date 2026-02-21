@@ -344,8 +344,8 @@
       ],
       "description": "Create src/watch/components/HelpBar.tsx — a dim 1-line keybinding reference bar. Wire as the last row in the root column flex in cmd-watch.tsx. Also wire all global keybindings (q exit, [ left, ] right, Tab focus). Adapt opendocker's packages/cli/src/components/footer.tsx. Full spec: tasks/prd-watch-epic-5-help-bar.md.",
       "id": "US-020",
-      "notes": "",
-      "passes": false,
+      "notes": "Created src/watch/components/HelpBar.tsx rendering the static keybinding reference line ([ left  ] right  Tab focus  j/k nav  r refresh  s scroll  p ports  q quit) styled with picocolors.dim(). Fixed height={1}, paddingX={1}. Updated cmd-watch.tsx WatchLayout to column flex: panel row (flexGrow=1) above, HelpBar (height=1) pinned at bottom. Global keybindings (q/[/]/Tab) were already wired. 150 bun tests pass, typecheck clean.",
+      "passes": true,
       "priority": 20,
       "title": "Build HelpBar.tsx and wire into main layout as fixed bottom row"
     }
