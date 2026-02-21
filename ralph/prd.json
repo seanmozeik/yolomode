@@ -290,8 +290,8 @@
       ],
       "description": "TDD: write failing bun tests first, then implement. Pure function `haveFilesChanged(prev, next)` used by useDirtyPoller to detect when new files are changed in the container without triggering re-renders. Full spec: tasks/prd-watch-epic-4-diff-panel.md US-004.",
       "id": "US-017",
-      "notes": "",
-      "passes": false,
+      "notes": "TDD: wrote 7 failing tests first (identical lists, added file, removed file, same files different order, empty→non-empty, non-empty→empty, both empty). Implemented pure haveFilesChanged() in src/watch/utils/fileListDiff.ts — sorts both arrays before comparing so order differences don't trigger false positives. 140 bun tests pass, typecheck clean.",
+      "passes": true,
       "priority": 17,
       "title": "TDD: file list change detection — haveFilesChanged (red-green)"
     },
