@@ -38,7 +38,7 @@ while (i < argv.length) {
   }
 }
 
-if (isNaN(maxIter) || maxIter < 1) {
+if (Number.isNaN(maxIter) || maxIter < 1) {
   console.error('error: max iterations must be a positive integer');
   process.exit(1);
 }
