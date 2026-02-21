@@ -47,8 +47,8 @@
         "`bun run src/cli.ts` (no args) launches the TUI; `bun run src/cli.ts --help` still shows help",
         "Typecheck passes"
       ],
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added import for cmdWatch, case 'watch' dispatching to cmdWatch(args.slice(1)), default no-arg case calling cmdWatch([]), watch entry in help table as first command, and --help/-h/help handling. Typecheck passes."
     },
     {
       "id": "US-004",
