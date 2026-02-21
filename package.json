@@ -10,6 +10,7 @@
     "boxen": "^8.0.1",
     "console-table-printer": "^2.15.0",
     "gradient-string": "^3.0.0",
+    "minimatch": "^10.2.2",
     "ora": "^9.3.0",
     "picocolors": "^1.1.1",
     "solid-js": "^1.9.11"
