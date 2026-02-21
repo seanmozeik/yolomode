@@ -1,6 +1,7 @@
 import type { KeyEvent } from '@opentui/core';
 import { render, useKeyboard, useRenderer } from '@opentui/solid';
 import { Show } from 'solid-js';
+import { AgentTerminal } from './watch/components/AgentTerminal';
 import { SessionList } from './watch/components/SessionList';
 import { AppProvider, useApp } from './watch/context/app';
 
@@ -28,9 +29,7 @@ function WatchLayout() {
           <SessionList />
         </box>
       </Show>
-      <box flexGrow={1} borderStyle="rounded" paddingLeft={1}>
-        <text>Select a session ↑↓ Enter</text>
-      </box>
+      <AgentTerminal />
       <box flexGrow={2} borderStyle="rounded" paddingLeft={1}>
         <text>Diff panel placeholder</text>
       </box>
