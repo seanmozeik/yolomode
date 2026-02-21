@@ -3,11 +3,16 @@
     "yolomode": "src/cli.ts"
   },
   "dependencies": {
+    "@opentui-ui/dialog": "^0.1.2",
+    "@opentui-ui/toast": "^0.0.5",
+    "@opentui/core": "^0.1.80",
+    "@opentui/solid": "^0.1.80",
     "boxen": "^8.0.1",
     "console-table-printer": "^2.15.0",
     "gradient-string": "^3.0.0",
     "ora": "^9.3.0",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "solid-js": "^1.9.11"
   },
   "description": "Claude Code skill manager and agent runner",
   "devDependencies": {
