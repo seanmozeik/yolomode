@@ -38,7 +38,7 @@
     "build": "bun run scripts/build.ts compile",
     "bundle": "bun build ./src/cli.ts --outdir dist --target=bun --bytecode --minify",
     "check": "biome check --write --unsafe .",
-    "dev": "bun run src/cli.ts",
+    "dev": "bun --preload @opentui/solid/preload src/cli.ts",
     "format": "biome format --write .",
     "tc": "tsc --noEmit"
   },
