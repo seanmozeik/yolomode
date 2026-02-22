@@ -124,6 +124,7 @@ ENV RUSTUP_HOME=/opt/rustup \
     CARGO_HOME=/home/yolo/.cargo \
     GOPATH=/home/yolo/go \
     UV_CACHE_DIR=/home/yolo/.cache/uv \
+    UV_LINK_MODE=copy \
     UV_TOOL_BIN_DIR=/home/yolo/.local/bin \
     npm_config_prefix=/home/yolo/.local \
     npm_config_cache=/home/yolo/.cache/npm \
