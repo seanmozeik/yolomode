@@ -68,7 +68,7 @@ RUN mise use -g go
 RUN mise use -g zig
 RUN mise use -g rust
 RUN mise use -g uv@latest
-RUN mise use -g python@3.13
+RUN mise use -g python@3.14
 
 # ---- Claude Code (official native installer) ----
 FROM bitnami/minideb:bookworm AS claude-install

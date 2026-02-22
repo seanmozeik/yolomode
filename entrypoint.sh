@@ -66,6 +66,9 @@ fi
 
 cd "$WORKDIR"
 
+# Trust mise config in the working directory (suppresses interactive prompt)
+mise trust --all >/dev/null 2>&1 || true
+
 # Set terminal window title to session name (ym-<container-name>)
 printf '\033]0;ym-%s\007' "$HOSTNAME"
 
