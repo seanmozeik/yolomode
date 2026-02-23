@@ -3,7 +3,7 @@
 // Reads prd.json, picks highest-priority incomplete story, implements, tests, commits.
 // Repeats until all stories are complete or max iterations reached.
 //
-// Usage: ralph <claude|codex> [--max-iterations N] [-- <agent args...>]
+// Usage: ralph <claude|codex> [--max N] [prd-file...] [-- <agent args...>]
 
 // ── placeholder: replace with real ASCII art ──────────────────────────────────
 const BANNER = `
@@ -42,26 +42,28 @@ function gradientBanner(text: string, stops: string[]): string {
 
 console.log(gradientBanner(BANNER, ['#ca9ee6', '#f4b8e4', '#babbf1']));
 
-const PROMPT =
-  'Read ralph/prd.json in the current directory. Find the highest-priority userStory where passes is false. Implement it fully: write the code, run any available tests (bun test), typecheck, and linting. Commit your changes with a message referencing the story ID. Finally, update ralph/prd.json to set that story\'s passes to true and add a brief implementation note in the notes field, then commit that change too. If ALL userStories already have passes true, output exactly <promise>COMPLETE</promise> and do nothing else.';
+function makePrompt(prdFile: string): string {
+  return `Read ${prdFile} in the current directory. Find the highest-priority userStory where passes is false. Implement it fully: write the code, run any available tests, typecheck, and lint. Commit your changes with a message referencing the story ID. Finally, update ${prdFile} to set that story's passes to true and add a brief implementation note in the notes field, then commit that change too. If ALL userStories already have passes true, output exactly <promise>COMPLETE</promise> and do nothing else.`;
+}
 
 const argv = process.argv.slice(2);
 
 const agent = argv[0];
 if (!agent || (agent !== 'claude' && agent !== 'codex')) {
-  console.error('usage: ralph <claude|codex> [--max-iterations N] [-- <agent args...>]');
+  console.error('usage: ralph <claude|codex> [--max N] [prd-file...] [-- <agent args...>]');
   process.exit(1);
 }
 
 let maxIter = parseInt(process.env.RALPH_MAX_ITERATIONS ?? '10', 10);
 let extraArgs: string[] = [];
+const prdFiles: string[] = [];
 let i = 1;
 
 while (i < argv.length) {
-  if (argv[i] === '--max-iterations') {
+  if (argv[i] === '--max') {
     i++;
     if (i >= argv.length) {
-      console.error('error: --max-iterations requires a value');
+      console.error('error: --max requires a value');
       process.exit(1);
     }
     maxIter = parseInt(argv[i], 10);
@@ -69,6 +71,9 @@ while (i < argv.length) {
   } else if (argv[i] === '--') {
     extraArgs = argv.slice(i + 1);
     break;
+  } else if (!argv[i].startsWith('--')) {
+    prdFiles.push(argv[i]);
+    i++;
   } else {
     console.error(`error: unknown argument: ${argv[i]}`);
     process.exit(1);
@@ -80,45 +85,133 @@ if (Number.isNaN(maxIter) || maxIter < 1) {
   process.exit(1);
 }
 
-console.log(`ralph: starting with ${agent} (max ${maxIter} iterations)\n`);
+if (prdFiles.length === 0) {
+  prdFiles.push('prd.json');
+}
 
-for (let iter = 1; iter <= maxIter; iter++) {
-  console.log(`=========================================`);
-  console.log(`ralph: iteration ${iter}/${maxIter}`);
-  console.log(`=========================================\n`);
+const MAX_CONCURRENT = 3;
 
-  const agentCmd =
-    agent === 'claude'
-      ? ['claude', '--dangerously-skip-permissions', '--print', ...extraArgs, PROMPT]
-      : ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', ...extraArgs, PROMPT];
+// Track active child processes for cleanup on signals
+const activeProcs = new Set<ReturnType<typeof Bun.spawn>>();
 
-  const proc = Bun.spawn(agentCmd, {
-    stderr: 'inherit',
-    stdout: 'pipe'
-  });
-
-  let output = '';
-  const reader = proc.stdout.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const chunk = decoder.decode(value, { stream: true });
-    output += chunk;
-    process.stdout.write(chunk);
-  }
-  await proc.exited;
-
-  if (output.includes('<promise>COMPLETE</promise>')) {
-    console.log('\nralph: all stories complete!');
-    process.exit(0);
-  }
-
-  if (iter < maxIter) {
-    await Bun.sleep(2000);
+function killAll() {
+  for (const p of activeProcs) {
+    try { p.kill(); } catch {}
   }
 }
 
-console.log(`\nralph: max iterations (${maxIter}) reached without completing all stories`);
-console.log('ralph: check prd.json for status');
-process.exit(1);
+process.on('SIGINT', () => { killAll(); process.exit(130); });
+process.on('SIGTERM', () => { killAll(); process.exit(143); });
+
+const prdLabel = prdFiles.length === 1 ? prdFiles[0] : prdFiles.join(', ');
+console.log(`ralph: starting with ${agent} on ${prdLabel} (max ${maxIter} iterations)\n`);
+
+async function runLoop(prdFile: string, label: string | null): Promise<boolean> {
+  let partial = '';
+
+  for (let iter = 1; iter <= maxIter; iter++) {
+    const bannerLine = `=========================================`;
+    const iterLine = `ralph: iteration ${iter}/${maxIter}`;
+
+    if (label) {
+      process.stdout.write(`[${label}] ${bannerLine}\n`);
+      process.stdout.write(`[${label}] ${iterLine}\n`);
+      process.stdout.write(`[${label}] ${bannerLine}\n\n`);
+    } else {
+      process.stdout.write(`${bannerLine}\n`);
+      process.stdout.write(`${iterLine}\n`);
+      process.stdout.write(`${bannerLine}\n\n`);
+    }
+
+    const prompt = makePrompt(prdFile);
+    const agentCmd =
+      agent === 'claude'
+        ? ['claude', '--dangerously-skip-permissions', '--print', ...extraArgs, prompt]
+        : ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', ...extraArgs, prompt];
+
+    const proc = Bun.spawn(agentCmd, {
+      stderr: 'inherit',
+      stdout: 'pipe'
+    });
+    activeProcs.add(proc);
+
+    let output = '';
+    const reader = proc.stdout.getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      output += chunk;
+
+      // Handle output prefixing for multi-loop runs
+      if (label) {
+        partial += chunk;
+        const lines = partial.split('\n');
+        for (let j = 0; j < lines.length - 1; j++) {
+          process.stdout.write(`[${label}] ${lines[j]}\n`);
+        }
+        partial = lines[lines.length - 1];
+      } else {
+        process.stdout.write(chunk);
+      }
+    }
+
+    // Flush remaining partial line
+    if (label && partial) {
+      process.stdout.write(`[${label}] ${partial}\n`);
+      partial = '';
+    }
+
+    await proc.exited;
+    activeProcs.delete(proc);
+
+    if (output.includes('<promise>COMPLETE</promise>')) {
+      if (label) {
+        process.stdout.write(`[${label}] ralph: all stories complete!\n`);
+      } else {
+        console.log('\nralph: all stories complete!');
+      }
+      return true;
+    }
+
+    if (iter < maxIter) {
+      await Bun.sleep(2000);
+    }
+  }
+
+  return false;
+}
+
+const stems = prdFiles.length > 1
+  ? prdFiles.map(f => f.replace(/^.*\//, '').replace(/\.json$/, ''))
+  : prdFiles.map(() => null);
+
+// Run loops with bounded concurrency
+async function runPool<T>(fns: (() => Promise<T>)[], limit: number): Promise<T[]> {
+  const results: T[] = new Array(fns.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < fns.length) {
+      const idx = next++;
+      results[idx] = await fns[idx]();
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, fns.length) }, () => worker()));
+  return results;
+}
+
+const tasks = prdFiles.map((f, i) => () => runLoop(f, stems[i]));
+const results = await runPool(tasks, MAX_CONCURRENT);
+const allComplete = results.every(r => r === true);
+
+if (allComplete) {
+  process.exit(0);
+} else {
+  console.log(`\nralph: max iterations (${maxIter}) reached without completing all stories`);
+  console.log('ralph: check prd files for status');
+  process.exit(1);
+}

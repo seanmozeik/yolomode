@@ -41,7 +41,7 @@ _yolomode() {
             if [[ "\${COMP_WORDS[1]}" == "ralph" ]]; then
                 local sessions
                 sessions=$(yolomode --complete sessions 2>/dev/null)
-                COMPREPLY=( $(compgen -W "$sessions --max-iterations --" -- "$cur") )
+                COMPREPLY=( $(compgen -W "$sessions --max --" -- "$cur") )
             fi
             ;;
     esac
@@ -110,7 +110,7 @@ _yolomode() {
                     _arguments \\
                         '1:agent:(claude codex)' \\
                         '2:session:compadd -a sessions' \\
-                        '--max-iterations[Max loop iterations]:count:'
+                        '--max[Max loop iterations]:count:'
                     ;;
             esac
             ;;
@@ -148,7 +148,7 @@ complete -c yolomode -n '__fish_seen_subcommand_from forward; and __fish_is_nth_
 # ralph: agent, session names, flags
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a 'claude codex' -f
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a '(yolomode --complete sessions 2>/dev/null)' -f
-complete -c yolomode -n '__fish_seen_subcommand_from ralph' -l max-iterations -d 'Max loop iterations'
+complete -c yolomode -n '__fish_seen_subcommand_from ralph' -l max -d 'Max loop iterations'
 
 # run flags
 complete -c yolomode -n '__fish_seen_subcommand_from run' -l import -d 'Copy file/dir into session' -r
@@ -248,7 +248,7 @@ export extern "${cmd} rm" [
 export extern "${cmd} ralph" [
     agent: string@"nu complete yolomode agents"
     name?: string@"nu complete yolomode sessions"
-    --max-iterations: int    # Max loop iterations (default: 10)
+    --max: int    # Max loop iterations (default: 10)
 ]
 
 export extern "${cmd} completions" [
@@ -309,12 +309,12 @@ export def "${cmd} rm" [
 export def "${cmd} ralph" [
     agent: string@"nu complete yolomode agents"
     name?: string@"nu complete yolomode sessions"
-    --max-iterations: int
+    --max: int
 ] {
     mut args = ["ralph"]
     $args = ($args | append $agent)
     if $name != null { $args = ($args | append $name) }
-    if $max_iterations != null { $args = ($args | append ["--max-iterations", ($max_iterations | into string)]) }
+    if $max != null { $args = ($args | append ["--max", ($max | into string)]) }
     yolomode ...$args
 }
 `;

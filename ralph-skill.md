@@ -1,10 +1,10 @@
 # Ralph: PRD-Driven Autonomous Development
 
-Ralph is an autonomous implementation loop. It reads `ralph/prd.json`, picks the highest-priority incomplete story, implements it, runs quality checks, commits, and marks it done. This repeats until all stories are complete.
+Ralph is an autonomous implementation loop. It reads `prd.json`, picks the highest-priority incomplete story, implements it, runs quality checks, commits, and marks it done. This repeats until all stories are complete.
 
 ## prd.json Format
 
-The PRD lives at `ralph/prd.json`:
+The PRD lives at `prd.json` in the project root:
 
 ```json
 {
@@ -47,7 +47,7 @@ When creating stories from a PRD:
 
 ## Acceptance Criteria Rules
 
-- Every story MUST include "Typecheck passes" as a criterion
+- Every story MUST include a criterion for the project's type/compile check (e.g. "Typecheck passes", "Cargo check passes", "go vet passes") — adapt to the language in use
 - UI stories MUST include browser/visual verification criteria
 - All criteria must be concretely verifiable (no vague "works correctly")
 - Write criteria as if for a junior developer
@@ -55,7 +55,7 @@ When creating stories from a PRD:
 ## Converting Markdown PRD to prd.json
 
 When asked to convert a markdown PRD document:
-1. Archive any existing `ralph/prd.json` first
+1. Archive any existing `prd.json` first
 2. Extract each feature/requirement as a story
 3. Assign priorities based on dependency order
 4. Write specific, verifiable acceptance criteria

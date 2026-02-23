@@ -147,8 +147,10 @@ Ralph is an autonomous implementation loop built into yolomode. It repeatedly ru
 
 ```
 yolomode ralph claude swift-fox
-yolomode ralph codex swift-fox --max-iterations 20
-yolomode ralph codex --max-iterations 20 -- --model gpt-5-codex
+yolomode ralph claude swift-fox --max 20
+yolomode ralph claude swift-fox prd1.json prd2.json
+yolomode ralph codex -- --model gpt-5-codex
+yolomode ralph codex --max 20 -- --model gpt-5-codex
 ```
 
 This runs the loop from your host machine, targeting a named container. Output streams in real time. Defaults to 10 iterations. If only one session is running, the name is optional. Agent-specific flags can be passed after `--`.
@@ -158,10 +160,16 @@ This runs the loop from your host machine, targeting a named container. Output s
 The `ralph` command is also available on PATH inside every container:
 
 ```
-ralph claude            # default 10 iterations
-ralph codex 20          # custom max iterations
+ralph claude                         # reads ./prd.json, 10 iterations
+ralph claude --max 20                # custom iteration limit
+ralph claude prd1.json prd2.json     # two PRDs in parallel
+ralph claude -- --model sonnet       # pass --model to the agent via --
 ralph codex -- --model gpt-5-codex
 ```
+
+#### Parallel PRD loops
+
+When running multiple PRD files in parallel, each loop's output is prefixed with the PRD filename stem (e.g., `[prd1]`, `[prd2]`). Running more than 3 simultaneous loops is not recommended — each loop spawns a full AI agent session.
 
 ### PRD format
 

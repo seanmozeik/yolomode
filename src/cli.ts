@@ -390,7 +390,7 @@ try {
         ['sync <name>', 'Extract full work dir from a session'],
         ['rm <name>', 'Remove a session (-a/--all for all stopped)'],
         ['completions <sh>', 'Print shell completions (bash|zsh|fish|nu)'],
-        ['ralph <claude|codex> [name]', 'Run ralph autonomous loop (--max-iterations N)']
+        ['ralph <claude|codex> [name]', 'Run ralph autonomous loop (--max N)']
       ];
       for (const [cmd, desc] of cmds) {
         console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(24)))}${pc.dim(desc)}`);
