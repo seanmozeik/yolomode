@@ -210,6 +210,7 @@ RUN VERSION=$(ls /opt/claude/versions/) \
     && ln -s /opt/claude/versions/$VERSION /home/yolo/.local/share/claude/versions/$VERSION \
     && printf '%s\n' \
        '#!/bin/sh' \
+       'export IS_SANDBOX=1' \
        'exec /usr/local/bin/claude --dangerously-skip-permissions "$@"' \
        > /home/yolo/.local/bin/claude \
     && chmod +x /home/yolo/.local/bin/claude \
