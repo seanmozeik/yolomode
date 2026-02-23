@@ -196,8 +196,6 @@ Create a `prd.json` in your project root:
 }
 ```
 
-A bundled ralph skill is mounted into every container at `~/.claude/skills/ralph.md`, teaching Claude Code how to work with the PRD format. You can also use the skill to convert a markdown PRD document into `prd.json`.
-
 ## Shell Completions
 
 Generate completion scripts for your shell:
@@ -301,7 +299,6 @@ src/
 Dockerfile        Multi-stage Alpine build
 entrypoint.sh     Container startup (credential copy, repo init)
 ralph.sh          In-container autonomous loop script
-ralph-skill.md    PRD skill bundled into containers
 ```
 
 ## Development
