@@ -46,9 +46,6 @@ RUN cargo-binstall --no-confirm gitui
 FROM cargo-base AS tool-lstr
 RUN cargo-binstall --no-confirm lstr
 
-FROM cargo-base AS tool-xh
-RUN cargo-binstall --no-confirm xh
-
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS node
 
@@ -151,7 +148,6 @@ COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
 COPY --from=tool-gitui /root/.cargo/bin/gitui /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
-COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -242,7 +238,62 @@ RUN printf '%s\n' \
     && chown yolo:yolo /home/yolo/.profile
 
 # Runtime parity check helper.
-COPY scripts/verify-codex-env.sh /usr/local/bin/verify-codex-env.sh
+RUN cat <<'EOF' >/usr/local/bin/verify-codex-env.sh
+#!/usr/bin/env sh
+set -eu
+
+required_path_entries="
+/opt/agent-browser/bin
+/home/yolo/.cargo/bin
+/home/yolo/go/bin
+/home/yolo/.local/bin
+/usr/local/bun/bin
+/opt/mise/shims
+/opt/cargo/bin
+"
+
+fail=0
+
+for entry in $required_path_entries; do
+  case ":$PATH:" in
+    *":$entry:"*) ;;
+    *)
+      echo "ERROR: PATH missing required entry: $entry" >&2
+      fail=1
+      ;;
+  esac
+done
+
+for var in HOME SHELL PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME RUSTUP_HOME; do
+  value="$(eval "printf '%s' \"\${$var:-}\"")"
+  if [ -z "$value" ]; then
+    echo "ERROR: required env var missing: $var" >&2
+    fail=1
+  fi
+done
+
+for bin in mise node uv codex claude; do
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "ERROR: required command not found on PATH: $bin" >&2
+    fail=1
+  fi
+done
+
+# Cargo and rustc are expected from mise shims in this image.
+for bin in cargo rustc; do
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "ERROR: expected Rust tool missing on PATH: $bin" >&2
+    fail=1
+  fi
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo "codex env verification failed" >&2
+  exit 1
+fi
+
+echo "codex env verification passed"
+EOF
 RUN chmod +x /usr/local/bin/verify-codex-env.sh
 
 # Entrypoint
