@@ -90,7 +90,7 @@ ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="$BUN_INSTALL/bin:$PATH"
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
 RUN bun install -g @openai/codex
-RUN bun install -g @biomejs/biome typescript
+RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
 
 # ---- Final runtime ----
