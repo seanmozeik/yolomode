@@ -43,6 +43,9 @@ RUN cargo-binstall --no-confirm git-delta
 FROM cargo-base AS tool-gitui
 RUN cargo-binstall --no-confirm gitui
 
+FROM cargo-base AS tool-lstr
+RUN cargo-binstall --no-confirm lstr
+
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS node
 
@@ -97,7 +100,7 @@ RUN install_packages gpg curl ca-certificates \
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | gpg --dearmor > /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list
 RUN install_packages \
-    git curl wget jq zsh bash micro \
+    git curl wget jq zsh bash micro less \
     build-essential openssh-client openssl libssl-dev \
     pkg-config \
     libffi-dev \
@@ -144,6 +147,7 @@ COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
 COPY --from=tool-gitui /root/.cargo/bin/gitui /usr/local/bin/
+COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -163,6 +167,7 @@ ENV HOME=/home/yolo
 ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
 # Default to truecolor — overridden at runtime by -e COLORTERM if host differs
 ENV COLORTERM=truecolor
+ENV PAGER=less
 
 # Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
 RUN printf '%s\n' \
