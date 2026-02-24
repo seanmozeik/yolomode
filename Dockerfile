@@ -283,7 +283,7 @@ for entry in $required_path_entries; do
   esac
 done
 
-for var in HOME SHELL PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME RUSTUP_HOME; do
+for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME RUSTUP_HOME; do
   value="$(eval "printf '%s' \"\${$var:-}\"")"
   if [ -z "$value" ]; then
     echo "ERROR: required env var missing: $var" >&2
