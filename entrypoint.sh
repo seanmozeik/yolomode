@@ -68,6 +68,14 @@ cd "$WORKDIR"
 
 # Trust mise config in the working directory (suppresses interactive prompt)
 mise trust --all >/dev/null 2>&1 || true
+# Rebuild shims to avoid stale paths when tool configs change.
+mise reshim >/dev/null 2>&1 || true
+
+# Validate env parity for Codex-style command execution.
+if ! /usr/local/bin/verify-codex-env.sh; then
+  echo "FATAL: codex environment verification failed" >&2
+  exit 1
+fi
 
 # Set terminal window title to session name (ym-<container-name>)
 printf '\033]0;ym-%s\007' "$HOSTNAME"

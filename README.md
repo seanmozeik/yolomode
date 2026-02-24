@@ -271,6 +271,19 @@ Place a `config.toml` at `~/.config/yolomode/config.toml` (or `$XDG_CONFIG_HOME/
 
 Your working directory is mounted read-only at `/src` inside the container. On first boot, the entrypoint copies everything (tracked and untracked files, excluding gitignored paths) into `/work`. The agent operates on that copy. The host filesystem is never written to.
 
+## Environment parity
+
+Container startup enforces a deterministic Codex environment by:
+- Applying a fixed toolchain `PATH` in entrypoint and `/etc/profile.d/codex-env.sh`
+- Running `mise reshim` to reconcile shims
+- Running `/usr/local/bin/verify-codex-env.sh` and failing startup if required vars/tools are missing
+
+You can run the verifier manually inside a session:
+
+```sh
+verify-codex-env.sh
+```
+
 ## Authentication
 
 Claude Code: OAuth tokens extracted from the macOS keychain and injected into the container.

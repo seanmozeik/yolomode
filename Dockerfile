@@ -231,6 +231,20 @@ RUN VERSION=$(ls /opt/claude/versions/) \
     && chmod +x /home/yolo/.local/bin/codex \
     && chown -R yolo:yolo /home/yolo
 
+# Non-interactive/login-safe environment for Codex subprocesses.
+COPY scripts/codex-env.sh /etc/profile.d/codex-env.sh
+RUN chmod 644 /etc/profile.d/codex-env.sh
+
+# Ensure login shells load profile.d exports even without bash-specific rc files.
+RUN printf '%s\n' \
+    'if [ -f /etc/profile ]; then . /etc/profile; fi' \
+    > /home/yolo/.profile \
+    && chown yolo:yolo /home/yolo/.profile
+
+# Runtime parity check helper.
+COPY scripts/verify-codex-env.sh /usr/local/bin/verify-codex-env.sh
+RUN chmod +x /usr/local/bin/verify-codex-env.sh
+
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
