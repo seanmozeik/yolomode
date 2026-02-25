@@ -89,6 +89,7 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
 RUN bun install -g @openai/codex
 RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
+RUN bun install -g @seanmozeik/markdown-display
 
 # ---- Final runtime ----
 FROM bitnami/minideb:bookworm AS runtime
