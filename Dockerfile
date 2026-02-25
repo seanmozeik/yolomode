@@ -90,6 +90,7 @@ RUN bun install -g @openai/codex
 RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
+RUN bun install -g opencode-ai
 
 # ---- Final runtime ----
 FROM bitnami/minideb:bookworm AS runtime
