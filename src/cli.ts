@@ -135,6 +135,17 @@ try {
         await writeFile(join(ctx, 'starship.toml'), STARSHIP);
         const buildArgs = ['build', '-t', IMAGE];
         if (hasFlag(args, '--no-cache')) buildArgs.push('--no-cache');
+        // Pass host GH token to avoid API rate limiting during binstall/mise downloads
+        let ghToken = process.env.GITHUB_TOKEN ?? '';
+        if (!ghToken) {
+          const r = await $`gh auth token`.quiet().nothrow().text();
+          ghToken = r.trim();
+        }
+        if (ghToken) {
+          const secretFile = join(ctx, '.gh-token');
+          await writeFile(secretFile, ghToken, { mode: 0o600 });
+          buildArgs.push('--secret', `id=gh_token,src=${secretFile}`);
+        }
         buildArgs.push(ctx);
         if (verbose) {
           // Inherit the parent TTY so docker emits ANSI colors and streams output live

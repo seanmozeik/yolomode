@@ -7,44 +7,68 @@
 # that run on any Linux, including glibc systems like the Debian runtime below.
 FROM alpine:3.23 AS cargo-base
 RUN apk add --no-cache curl bash
-RUN curl -L --proto '=https' --tlsv1.2 -sSf \
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    curl -L --proto '=https' --tlsv1.2 -sSf \
     https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
 ENV PATH="/root/.cargo/bin:${PATH}"
 ENV BINSTALL_DISABLE_TELEMETRY=true
 
 # ---- Rust tools (BuildKit runs these in parallel) ----
 FROM cargo-base AS tool-ripgrep
-RUN cargo-binstall --no-confirm ripgrep
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm ripgrep
 
 FROM cargo-base AS tool-fd
-RUN cargo-binstall --no-confirm fd-find
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm fd-find
 
 FROM cargo-base AS tool-sd
-RUN cargo-binstall --no-confirm sd
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm sd
 
 FROM cargo-base AS tool-starship
-RUN cargo-binstall --no-confirm starship
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm starship
 
 FROM cargo-base AS tool-just
-RUN cargo-binstall --no-confirm just
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm just
 
 FROM cargo-base AS tool-xh
-RUN cargo-binstall --no-confirm xh
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm xh
 
 FROM cargo-base AS tool-nu
-RUN cargo-binstall --no-confirm nu
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm nu
 
 FROM cargo-base AS tool-bat
-RUN cargo-binstall --no-confirm bat
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm bat
 
 FROM cargo-base AS tool-delta
-RUN cargo-binstall --no-confirm git-delta
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm git-delta
 
 FROM cargo-base AS tool-gitui
-RUN cargo-binstall --no-confirm gitui
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm gitui
 
 FROM cargo-base AS tool-lstr
-RUN cargo-binstall --no-confirm lstr
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm lstr
 
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS node
@@ -67,11 +91,21 @@ RUN curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor > /usr/share/key
 ENV MISE_DATA_DIR=/opt/mise MISE_CONFIG_DIR=/opt/mise/config \
     RUSTUP_HOME=/opt/rustup CARGO_HOME=/opt/cargo XDG_DATA_HOME=/opt/mise
 RUN mkdir -p /opt/mise /opt/rustup /opt/cargo
-RUN mise use -g go
-RUN mise use -g zig
-RUN mise use -g rust
-RUN mise use -g uv@latest
-RUN mise use -g python@3.14
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    mise use -g go
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    mise use -g zig
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    mise use -g rust
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    mise use -g uv@latest
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    mise use -g python@3.14
 
 # ---- Claude Code (official native installer) ----
 FROM bitnami/minideb:bookworm AS claude-install

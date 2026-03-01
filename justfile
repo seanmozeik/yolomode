@@ -11,3 +11,7 @@ install: build
 # Run in dev mode (no compile)
 dev *args:
   bun run src/cli.ts {{args}}
+
+# Build the Docker image (passes host gh auth token to avoid rate limiting)
+docker-build *args:
+  GITHUB_TOKEN=$(gh auth token) docker build --secret id=gh_token,env=GITHUB_TOKEN {{args}} .
