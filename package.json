@@ -3,17 +3,12 @@
     "yolomode": "src/cli.ts"
   },
   "dependencies": {
-    "@opentui-ui/dialog": "^0.1.2",
-    "@opentui-ui/toast": "^0.0.5",
-    "@opentui/core": "^0.1.80",
-    "@opentui/solid": "^0.1.80",
     "boxen": "^8.0.1",
     "console-table-printer": "^2.15.0",
     "gradient-string": "^3.0.0",
     "minimatch": "^10.2.2",
     "ora": "^9.3.0",
-    "picocolors": "^1.1.1",
-    "solid-js": "^1.9.11"
+    "picocolors": "^1.1.1"
   },
   "description": "Claude Code skill manager and agent runner",
   "devDependencies": {
@@ -38,7 +33,7 @@
     "build": "bun run scripts/build.ts compile",
     "bundle": "bun build ./src/cli.ts --outdir dist --target=bun --bytecode --minify",
     "check": "biome check --write --unsafe .",
-    "dev": "bun --preload @opentui/solid/preload src/cli.ts",
+    "dev": "bun src/cli.ts",
     "format": "biome format --write .",
     "tc": "tsc --noEmit"
   },

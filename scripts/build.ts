@@ -1,5 +1,3 @@
-import solidPlugin from './solid-plugin';
-
 function getCompileTarget(): string {
   const arch = process.arch;
   switch (process.platform) {
@@ -30,7 +28,6 @@ async function runBuild(mode: string): Promise<void> {
       entrypoints: ['./src/cli.ts'],
       format: 'esm',
       minify: true,
-      plugins: [solidPlugin],
       target: 'bun'
     });
 

@@ -15,7 +15,6 @@ import { cmdApply } from './cmd-apply';
 import { cmdForward } from './cmd-forward';
 import { cmdRalph, RALPH } from './cmd-ralph';
 import { cmdRun } from './cmd-run';
-import { cmdWatch } from './cmd-watch';
 import { cmdCompletions } from './completions';
 import { BANNER, FORWARDS_DIR, HOME, IMAGE } from './constants';
 import {
@@ -358,17 +357,7 @@ try {
       break;
     }
 
-    case 'watch': {
-      await cmdWatch(args.slice(1));
-      break;
-    }
-
     default: {
-      // No arguments: launch TUI as default entry point
-      if (!command) {
-        await cmdWatch([]);
-        break;
-      }
       console.log(
         boxen(
           gradient(['#ca9ee6', '#f4b8e4', '#babbf1'])(BANNER) +
@@ -384,7 +373,6 @@ try {
       );
       console.log();
       const cmds = [
-        ['watch [name] [--all]', 'Full TUI session monitor (default)'],
         ['build', 'Build the Docker image  (--no-cache, -v/--verbose for live output)'],
         [
           'run',
@@ -407,7 +395,7 @@ try {
         console.log(`  ${pc.cyan(pc.bold(cmd.padEnd(24)))}${pc.dim(desc)}`);
       }
       console.log();
-      if (command !== '--help' && command !== '-h' && command !== 'help') {
+      if (command && command !== '--help' && command !== '-h' && command !== 'help') {
         die(`unknown command: ${command}`);
       }
       break;
