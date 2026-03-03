@@ -124,6 +124,7 @@ RUN bun install -g @openai/codex
 RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
+RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g opencode-ai
 
 # ---- Final runtime ----
@@ -215,12 +216,14 @@ RUN printf '%s\n' \
     'precmd_functions+=(_ym_title)' \
     'alias cc="claude"' \
     'alias co="codex"' \
+    'alias cw="claudewatch"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
     'alias cc="claude"' \
     'alias co="codex"' \
+    'alias cw="claudewatch"' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -234,6 +237,7 @@ RUN mkdir -p /home/yolo/.config/nushell \
     '$env.VISUAL = "micro"' \
     'alias cc = claude' \
     'alias co = codex' \
+    'alias cw = claudewatch' \
     'alias .. = cd ..' \
     >> /home/yolo/.config/nushell/config.nu \
     && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
