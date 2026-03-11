@@ -142,7 +142,7 @@ export async function cmdRun(args: string[]): Promise<void> {
   ];
   for (const p of hostSkillPaths) {
     if (await dirExists(p)) {
-      await $`cp -r ${p}/. ${skillsTmpDir}/`.quiet();
+      await $`cp -r ${p}/. ${skillsTmpDir}/`.quiet().nothrow();
     }
   }
   // Mount for Claude (~/.claude/skills/) and Codex (~/.agents/skills/)
@@ -155,7 +155,7 @@ export async function cmdRun(args: string[]): Promise<void> {
     // marketplaces/ to cache its GitHub index, so a :ro mount breaks it.
     const pluginsTmpDir = await mkdtemp(join(tmpdir(), 'yolomode-plugins-'));
     tmpdirs.push(pluginsTmpDir);
-    await $`cp -r ${claudePlugins}/. ${pluginsTmpDir}/`.quiet();
+    await $`cp -r ${claudePlugins}/. ${pluginsTmpDir}/`.quiet().nothrow();
     // Rewrite host home paths in plugin JSON files (installLocation /
     // installPath fields are hardcoded to the host's HOME).
     for (const fname of ['known_marketplaces.json', 'installed_plugins.json']) {
@@ -259,6 +259,10 @@ export async function cmdRun(args: string[]): Promise<void> {
     'TERM',
     '-e',
     'COLORTERM',
+    '-e',
+    'TERM_PROGRAM',
+    '-e',
+    'TERM_PROGRAM_VERSION',
     '-e',
     `COLUMNS=${cols}`,
     '-e',

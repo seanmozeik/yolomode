@@ -9,6 +9,7 @@ import gradient from 'gradient-string';
 import ora from 'ora';
 import pc from 'picocolors';
 import STARSHIP from '../config/starship.toml' with { type: 'text' };
+import GHOSTTY_TERMINFO from '../config/xterm-ghostty.terminfo' with { type: 'text' };
 import DOCKERFILE from '../Dockerfile' with { type: 'text' };
 import ENTRYPOINT from '../entrypoint.sh' with { type: 'text' };
 import { cmdApply } from './cmd-apply';
@@ -128,6 +129,7 @@ try {
         await writeFile(join(ctx, 'entrypoint.sh'), ENTRYPOINT, {
           mode: 0o755
         });
+        await writeFile(join(ctx, 'xterm-ghostty.terminfo'), GHOSTTY_TERMINFO);
         await writeFile(join(ctx, 'ralph.ts'), RALPH, {
           mode: 0o755
         });

@@ -7,7 +7,7 @@ set -e
 # that may source login files resetting PATH to system defaults.
 export PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:/usr/local/bun/bin:/opt/mise/shims:/opt/cargo/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-# Use xterm-256color when the host TERM has no terminfo entry in Alpine
+# Fall back only when the incoming TERM has no terminfo entry in the image.
 if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then
   export TERM=xterm-256color
 fi

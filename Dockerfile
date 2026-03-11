@@ -149,6 +149,7 @@ RUN install_packages \
     git-lfs \
     patch rsync \
     gh mise \
+    ncurses-bin ncurses-term \
     libncurses5 \
     coreutils findutils grep \
     zsh-autosuggestions zsh-syntax-highlighting \
@@ -197,6 +198,10 @@ COPY --from=bun-tools /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup
 COPY --from=mise-tools /opt/cargo /opt/cargo
+COPY xterm-ghostty.terminfo /tmp/xterm-ghostty.terminfo
+RUN mkdir -p /usr/share/terminfo \
+    && tic -x -o /usr/share/terminfo /tmp/xterm-ghostty.terminfo \
+    && rm /tmp/xterm-ghostty.terminfo
 
 # Create non-root user
 RUN groupadd -g 1000 yolo && useradd -u 1000 -g yolo -d /home/yolo -s /usr/local/bin/nu -m yolo
@@ -206,9 +211,9 @@ ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
 ENV COLORTERM=truecolor
 ENV PAGER=less
 
-# Shell setup (auto-detect TERM support, prefer xterm-256color when unavailable)
+# Shell setup (keep host TERM when supported; fall back only for unknown entries)
 RUN printf '%s\n' \
-    'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
+    'if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh' \
     'source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh' \
     'eval "$(starship init zsh)"' \
@@ -219,7 +224,7 @@ RUN printf '%s\n' \
     'alias cw="claudewatch"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
-    'if ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
+    'if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
     'eval "$(starship init bash)"' \
     'alias cc="claude"' \
     'alias co="codex"' \
