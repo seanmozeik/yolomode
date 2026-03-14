@@ -54,7 +54,7 @@ git commit -m "Add entrypoint script for CWD isolation"
 
 **Step 1: Write the parallel tool stages**
 
-Reference `/Users/sean/dev/brad/openclaw-container-setup/Dockerfile` for the cargo-binstall pattern.
+Reference the `openclaw-container-setup` Dockerfile for the cargo-binstall pattern.
 
 ```dockerfile
 # ==================================================

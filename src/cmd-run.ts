@@ -166,8 +166,8 @@ export async function cmdRun(args: string[]): Promise<void> {
         // (HOME + ".claude", missing the separator) that Claude Code sometimes writes.
         // Using join(HOME, ".claude") normalises any trailing slash in HOME so we
         // never accidentally eat the "/" that separates the home dir from ".claude".
-        const correctClaudeDir = join(HOME, '.claude'); // e.g. /Users/sean/.claude
-        const buggyClaudeDir = `${HOME.replace(/\/$/, '')}.claude`; // e.g. /Users/sean.claude
+        const correctClaudeDir = join(HOME, '.claude'); // e.g. /home/alice/.claude
+        const buggyClaudeDir = `${HOME.replace(/\/$/, '')}.claude`; // e.g. /home/alice.claude
         const fixed = data
           .replaceAll(correctClaudeDir, '/home/yolo/.claude')
           .replaceAll(buggyClaudeDir, '/home/yolo/.claude');
