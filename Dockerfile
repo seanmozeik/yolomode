@@ -74,11 +74,8 @@ RUN --mount=type=secret,id=gh_token \
 FROM bitnami/node:latest AS node
 
 FROM node AS agent-browser-tools
-ENV npm_config_prefix=/opt/agent-browser \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+ENV npm_config_prefix=/opt/agent-browser
 RUN npm install -g agent-browser
-# Download Playwright's own Chromium — tested against the exact agent-browser/Playwright version
-RUN /opt/agent-browser/bin/agent-browser install
 
 # ---- Language runtimes via mise (each on its own layer for caching) ----
 FROM bitnami/minideb:bookworm AS mise-tools
@@ -171,7 +168,6 @@ ENV RUSTUP_HOME=/opt/rustup \
     npm_config_prefix=/home/yolo/.local \
     npm_config_cache=/home/yolo/.cache/npm \
     PIP_CACHE_DIR=/home/yolo/.cache/pip \
-    PLAYWRIGHT_BROWSERS_PATH=/opt/playwright \
     PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:$BUN_INSTALL/bin:/opt/mise/shims:/opt/cargo/bin:${PATH}"
 
 # Copy tool binaries
@@ -191,7 +187,6 @@ RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
     && ln -s /opt/bitnami/node/bin/npx /usr/local/bin/npx
 COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
-COPY --from=agent-browser-tools /opt/playwright /opt/playwright
 COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
 RUN ln -s /opt/claude/versions/$(ls /opt/claude/versions/) /usr/local/bin/claude
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
@@ -288,7 +283,7 @@ export UV_TOOL_BIN_DIR=/home/yolo/.local/bin
 export npm_config_prefix=/home/yolo/.local
 export npm_config_cache=/home/yolo/.cache/npm
 export PIP_CACHE_DIR=/home/yolo/.cache/pip
-export PLAYWRIGHT_BROWSERS_PATH=/opt/playwright
+export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 
 # Keep this in sync with Dockerfile + entrypoint for Codex parity.
 export PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:/usr/local/bun/bin:/opt/mise/shims:/opt/cargo/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
