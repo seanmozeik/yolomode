@@ -60,15 +60,23 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm git-delta
 
-FROM cargo-base AS tool-gitui
+FROM cargo-base AS tool-cargo-insta
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
-    cargo-binstall --no-confirm gitui
+    cargo-binstall --no-confirm cargo-insta
 
 FROM cargo-base AS tool-lstr
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm lstr
+
+# ---- lazygit (direct GitHub release) ----
+FROM alpine:3.23 AS tool-lazygit
+RUN apk add --no-cache curl tar gzip
+RUN LAZYGIT_VERSION=$(curl -s https://api.github.com/repos/jesseduffield/lazygit/releases/latest | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/') \
+    && curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_linux_x86_64.tar.gz" \
+    && tar xzf lazygit.tar.gz lazygit \
+    && mv lazygit /usr/local/bin/
 
 # ---- agent-browser (node-based, own stage) ----
 FROM bitnami/node:latest AS node
@@ -180,7 +188,8 @@ COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
-COPY --from=tool-gitui /root/.cargo/bin/gitui /usr/local/bin/
+COPY --from=tool-lazygit /usr/local/bin/lazygit /usr/local/bin/
+COPY --from=tool-cargo-insta /root/.cargo/bin/cargo-insta /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
@@ -217,6 +226,7 @@ RUN printf '%s\n' \
     'alias cc="claude"' \
     'alias co="codex"' \
     'alias cw="claudewatch"' \
+    'alias lg="lazygit"' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
@@ -224,6 +234,7 @@ RUN printf '%s\n' \
     'alias cc="claude"' \
     'alias co="codex"' \
     'alias cw="claudewatch"' \
+    'alias lg="lazygit"' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -238,9 +249,20 @@ RUN mkdir -p /home/yolo/.config/nushell \
     'alias cc = claude' \
     'alias co = codex' \
     'alias cw = claudewatch' \
+    'alias lg = lazygit' \
     'alias .. = cd ..' \
     >> /home/yolo/.config/nushell/config.nu \
-    && chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
+    && cat <<'NUEOF' >> /home/yolo/.config/nushell/config.nu
+def "nu-complete just" [] {
+    (^just --dump --unstable --dump-format json | from json).recipes | transpose recipe data | flatten | where {|row| $row.private == false } | select recipe doc parameters | rename value description
+}
+
+# Just: A Command Runner
+export extern "just" [
+    ...recipe: string@"nu-complete just", # Recipe(s) to run, may be with argument(s)
+]
+NUEOF
+RUN chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
 
 # Make global bun dir writable for runtime package installs
 RUN chown -R yolo:yolo /usr/local/bun
