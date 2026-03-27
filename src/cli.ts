@@ -136,6 +136,7 @@ try {
         await writeFile(join(ctx, 'starship.toml'), STARSHIP);
         const buildArgs = ['build', '-t', IMAGE];
         if (hasFlag(args, '--no-cache')) buildArgs.push('--no-cache');
+        else buildArgs.push('--no-cache-filter=claude-install,codex-install');
         // Pass host GH token to avoid API rate limiting during binstall/mise downloads
         let ghToken = process.env.GITHUB_TOKEN ?? '';
         if (!ghToken) {

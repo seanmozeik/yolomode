@@ -13,5 +13,6 @@ dev *args:
   bun run src/cli.ts {{args}}
 
 # Build the Docker image (passes host gh auth token to avoid rate limiting)
+# Always re-fetches Claude Code + Codex; use --no-cache for a full rebuild
 docker-build *args:
-  GITHUB_TOKEN=$(gh auth token) docker build --secret id=gh_token,env=GITHUB_TOKEN {{args}} .
+  GITHUB_TOKEN=$(gh auth token) docker build --secret id=gh_token,env=GITHUB_TOKEN --no-cache-filter=claude-install,codex-install {{args}} .

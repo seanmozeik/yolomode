@@ -70,6 +70,11 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm lstr
 
+FROM cargo-base AS tool-fresh
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm fresh-editor
+
 # ---- lazygit (direct GitHub release) ----
 FROM alpine:3.23 AS tool-lazygit
 RUN apk add --no-cache curl tar gzip
@@ -119,13 +124,19 @@ ENV HOME=/opt/claude-home
 RUN mkdir -p /opt/claude-home \
     && curl -fsSL https://claude.ai/install.sh | bash
 
-# ---- Bun + Codex + dev tools ----
-FROM bitnami/minideb:bookworm AS bun-tools
+# ---- Bun base (shared by bun tool stages) ----
+FROM bitnami/minideb:bookworm AS bun-base
 RUN install_packages curl bash ca-certificates unzip
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="$BUN_INSTALL/bin:$PATH"
 RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
+
+# ---- Codex (own stage so --no-cache-filter can target it) ----
+FROM bun-base AS codex-install
 RUN bun install -g @openai/codex
+
+# ---- Bun dev tools (cached normally) ----
+FROM bun-base AS bun-tools
 RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
@@ -191,6 +202,7 @@ COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
 COPY --from=tool-lazygit /usr/local/bin/lazygit /usr/local/bin/
 COPY --from=tool-cargo-insta /root/.cargo/bin/cargo-insta /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
+COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -199,6 +211,7 @@ COPY --from=agent-browser-tools /opt/agent-browser /opt/agent-browser
 COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
 RUN ln -s /opt/claude/versions/$(ls /opt/claude/versions/) /usr/local/bin/claude
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
+COPY --from=codex-install /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup
 COPY --from=mise-tools /opt/cargo /opt/cargo
