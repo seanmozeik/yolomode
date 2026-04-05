@@ -216,6 +216,10 @@ ENV MISE_DATA_DIR=/opt/mise \
 # Writable package manager homes for runtime installs
 ENV RUSTUP_HOME=/home/yolo/.rustup \
     CARGO_HOME=/home/yolo/.cargo \
+    RUSTC_WRAPPER=/usr/local/bin/sccache \
+    SCCACHE_DIR=/home/yolo/.cache/sccache \
+    SCCACHE_CACHE_SIZE=10G \
+    CARGO_INCREMENTAL=1 \
     GOPATH=/home/yolo/go \
     UV_CACHE_DIR=/home/yolo/.cache/uv \
     UV_LINK_MODE=copy \
