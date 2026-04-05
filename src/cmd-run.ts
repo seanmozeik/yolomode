@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -6,7 +7,7 @@ import { $ } from 'bun';
 import ora from 'ora';
 import pc from 'picocolors';
 import { writeBundledSkills } from './bundled-skills';
-import { HOME, IMAGE } from './constants';
+import { HOME, IMAGE, PERSISTENT_VOLUMES } from './constants';
 import {
   copyImports,
   die,
@@ -98,6 +99,7 @@ function parsePortPublishArg(value: string): { host: number; container: number }
 export async function cmdRun(args: string[]): Promise<void> {
   const name = await generateUniqueName();
   const workDir = toWorkDir(process.cwd());
+  const cargoTargetDir = `/home/yolo/.cache/cargo-target/${createHash('sha256').update(workDir).digest('hex').slice(0, 16)}`;
   const mounts: string[] = [];
   const tmpdirs: string[] = [];
 
@@ -222,7 +224,17 @@ export async function cmdRun(args: string[]): Promise<void> {
 
   // Named volume for the work dir — survives container kills and removes
   await $`docker volume create ${name}`.quiet();
+  await $`docker volume create ${PERSISTENT_VOLUMES.cargoRegistry}`.quiet();
+  await $`docker volume create ${PERSISTENT_VOLUMES.cargoGit}`.quiet();
+  await $`docker volume create ${PERSISTENT_VOLUMES.cargoTarget}`.quiet();
+  await $`docker volume create ${PERSISTENT_VOLUMES.rustup}`.quiet();
+  await $`docker volume create ${PERSISTENT_VOLUMES.sccache}`.quiet();
   await $`docker run --rm -v ${name}:${workDir} alpine sh -c ${`mkdir -p ${workDir} && chown 1000:1000 ${workDir}`}`.quiet();
+  await $`docker run --rm -v ${PERSISTENT_VOLUMES.cargoRegistry}:/mnt alpine sh -c ${'mkdir -p /mnt && chown 1000:1000 /mnt'}`.quiet();
+  await $`docker run --rm -v ${PERSISTENT_VOLUMES.cargoGit}:/mnt alpine sh -c ${'mkdir -p /mnt && chown 1000:1000 /mnt'}`.quiet();
+  await $`docker run --rm -v ${PERSISTENT_VOLUMES.cargoTarget}:/mnt alpine sh -c ${`mkdir -p /mnt${cargoTargetDir} && chown -R 1000:1000 /mnt`}`.quiet();
+  await $`docker run --rm -v ${PERSISTENT_VOLUMES.rustup}:/mnt alpine sh -c ${'mkdir -p /mnt && chown 1000:1000 /mnt'}`.quiet();
+  await $`docker run --rm -v ${PERSISTENT_VOLUMES.sccache}:/mnt alpine sh -c ${'mkdir -p /mnt && chown 1000:1000 /mnt'}`.quiet();
 
   spinner.succeed(`Session ${pc.cyan(pc.bold(name))} ready`);
   console.log();
@@ -247,6 +259,16 @@ export async function cmdRun(args: string[]): Promise<void> {
     '-v',
     `${name}:${workDir}`,
     '-v',
+    `${PERSISTENT_VOLUMES.cargoRegistry}:/home/yolo/.cargo/registry`,
+    '-v',
+    `${PERSISTENT_VOLUMES.cargoGit}:/home/yolo/.cargo/git`,
+    '-v',
+    `${PERSISTENT_VOLUMES.cargoTarget}:/home/yolo/.cache/cargo-target`,
+    '-v',
+    `${PERSISTENT_VOLUMES.rustup}:/home/yolo/.rustup`,
+    '-v',
+    `${PERSISTENT_VOLUMES.sccache}:/home/yolo/.cache/sccache`,
+    '-v',
     `${process.cwd()}:/src:ro`,
     ...mounts,
     '-e',
@@ -255,6 +277,8 @@ export async function cmdRun(args: string[]): Promise<void> {
     'OPENAI_API_KEY',
     '-e',
     `PROJECT_DIR=${workDir}`,
+    '-e',
+    `CARGO_TARGET_DIR=${cargoTargetDir}`,
     '-e',
     'TERM',
     '-e',

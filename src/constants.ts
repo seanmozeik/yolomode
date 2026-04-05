@@ -4,6 +4,13 @@ import { join } from 'node:path';
 export const IMAGE = 'yolomode';
 export const HOME = process.env.HOME ?? '';
 export const FORWARDS_DIR = join(tmpdir(), 'yolomode-forwards');
+export const PERSISTENT_VOLUMES = {
+  cargoGit: 'yolomode-cargo-git',
+  cargoRegistry: 'yolomode-cargo-registry',
+  cargoTarget: 'yolomode-cargo-target',
+  rustup: 'yolomode-rustup',
+  sccache: 'yolomode-sccache'
+} as const;
 
 export const BANNER = `             _                           _      
             | |                         | |     

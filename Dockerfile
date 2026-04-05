@@ -65,6 +65,36 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm cargo-insta
 
+FROM cargo-base AS tool-cargo-nextest
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm cargo-nextest
+
+FROM cargo-base AS tool-sccache
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm sccache
+
+FROM cargo-base AS tool-bacon
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm bacon
+
+FROM cargo-base AS tool-cargo-edit
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm cargo-edit
+
+FROM cargo-base AS tool-cargo-llvm-cov
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm cargo-llvm-cov
+
+FROM cargo-base AS tool-cargo-watch
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm cargo-watch
+
 FROM cargo-base AS tool-lstr
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
@@ -155,12 +185,18 @@ RUN install_packages gpg curl ca-certificates \
 RUN install_packages \
     git curl wget jq zsh bash micro less \
     build-essential openssh-client openssl libssl-dev \
+    clang lld \
+    cmake ninja-build \
+    mold \
     pkg-config \
+    protobuf-compiler \
     libffi-dev \
+    libclang-dev \
     libsqlite3-dev \
     libxml2-dev libxslt1-dev \
     libpng-dev libjpeg-dev \
     libpq-dev \
+    musl-tools \
     ca-certificates \
     git-lfs \
     patch rsync \
@@ -178,7 +214,7 @@ ENV MISE_DATA_DIR=/opt/mise \
     MISE_CONFIG_DIR=/opt/mise/config
 
 # Writable package manager homes for runtime installs
-ENV RUSTUP_HOME=/opt/rustup \
+ENV RUSTUP_HOME=/home/yolo/.rustup \
     CARGO_HOME=/home/yolo/.cargo \
     GOPATH=/home/yolo/go \
     UV_CACHE_DIR=/home/yolo/.cache/uv \
@@ -199,8 +235,18 @@ COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
 COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
+COPY --from=cargo-base /root/.cargo/bin/cargo-binstall /usr/local/bin/
 COPY --from=tool-lazygit /usr/local/bin/lazygit /usr/local/bin/
 COPY --from=tool-cargo-insta /root/.cargo/bin/cargo-insta /usr/local/bin/
+COPY --from=tool-cargo-nextest /root/.cargo/bin/cargo-nextest /usr/local/bin/
+COPY --from=tool-sccache /root/.cargo/bin/sccache /usr/local/bin/
+COPY --from=tool-bacon /root/.cargo/bin/bacon /usr/local/bin/
+COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-add /usr/local/bin/
+COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-rm /usr/local/bin/
+COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-set-version /usr/local/bin/
+COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-upgrade /usr/local/bin/
+COPY --from=tool-cargo-llvm-cov /root/.cargo/bin/cargo-llvm-cov /usr/local/bin/
+COPY --from=tool-cargo-watch /root/.cargo/bin/cargo-watch /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
@@ -285,7 +331,9 @@ RUN mkdir -p /usr/local/share/npm-global && \
 COPY starship.toml /home/yolo/.config/starship.toml
 RUN VERSION=$(ls /opt/claude/versions/) \
     && mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
-       /home/yolo/.cargo/bin /home/yolo/go/bin \
+       /home/yolo/.cargo/bin /home/yolo/.cargo/git /home/yolo/.cargo/registry \
+       /home/yolo/.rustup \
+       /home/yolo/.cache/sccache /home/yolo/go/bin \
        /home/yolo/.cache/uv /home/yolo/.cache/npm /home/yolo/.cache/pip \
        /home/yolo/.local/bin /home/yolo/.local/share/claude/versions \
     && ln -s /opt/claude/versions/$VERSION /home/yolo/.local/share/claude/versions/$VERSION \
@@ -299,8 +347,34 @@ RUN VERSION=$(ls /opt/claude/versions/) \
        '#!/bin/sh' \
        'exec /usr/local/bun/bin/codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen "$@"' \
        > /home/yolo/.local/bin/codex \
-    && chmod +x /home/yolo/.local/bin/codex \
-    && chown -R yolo:yolo /home/yolo
+    && chmod +x /home/yolo/.local/bin/codex
+RUN cat <<'EOF' > /home/yolo/.cargo/config.toml
+[build]
+rustc-wrapper = "/usr/local/bin/sccache"
+
+[target.x86_64-unknown-linux-gnu]
+linker = "/usr/local/bin/cc-mold"
+
+[target.aarch64-unknown-linux-gnu]
+linker = "/usr/local/bin/cc-mold"
+
+[profile.dev]
+debug = 1
+
+[profile.test]
+debug = 1
+
+[alias]
+nt = "nextest run"
+nw = "nextest run --workspace"
+EOF
+RUN chown -R yolo:yolo /home/yolo
+
+RUN cat <<'EOF' >/usr/local/bin/cc-mold
+#!/bin/sh
+exec cc -fuse-ld=mold "$@"
+EOF
+RUN chmod +x /usr/local/bin/cc-mold
 
 # Non-interactive/login-safe environment for Codex subprocesses.
 RUN cat <<'EOF' >/etc/profile.d/codex-env.sh
@@ -309,9 +383,14 @@ RUN cat <<'EOF' >/etc/profile.d/codex-env.sh
 export BUN_INSTALL=/usr/local/bun
 export MISE_DATA_DIR=/opt/mise
 export MISE_CONFIG_DIR=/opt/mise/config
-export RUSTUP_HOME=/opt/rustup
+export RUSTUP_HOME=/home/yolo/.rustup
 export CARGO_HOME=/home/yolo/.cargo
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/home/yolo/.cache/cargo-target/default}"
 export GOPATH=/home/yolo/go
+export RUSTC_WRAPPER=/usr/local/bin/sccache
+export SCCACHE_DIR=/home/yolo/.cache/sccache
+export SCCACHE_CACHE_SIZE=10G
+export CARGO_INCREMENTAL=1
 export UV_CACHE_DIR=/home/yolo/.cache/uv
 export UV_LINK_MODE=copy
 export UV_TOOL_BIN_DIR=/home/yolo/.local/bin
@@ -319,6 +398,15 @@ export npm_config_prefix=/home/yolo/.local
 export npm_config_cache=/home/yolo/.cache/npm
 export PIP_CACHE_DIR=/home/yolo/.cache/pip
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+
+if [ -z "${LIBCLANG_PATH:-}" ]; then
+  for dir in /usr/lib/llvm-*/lib; do
+    if [ -d "$dir" ]; then
+      export LIBCLANG_PATH="$dir"
+      break
+    fi
+  done
+fi
 
 # Keep this in sync with Dockerfile + entrypoint for Codex parity.
 export PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:/usr/local/bun/bin:/opt/mise/shims:/opt/cargo/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -358,7 +446,7 @@ for entry in $required_path_entries; do
   esac
 done
 
-for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME RUSTUP_HOME; do
+for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME CARGO_TARGET_DIR RUSTUP_HOME RUSTC_WRAPPER SCCACHE_DIR; do
   value="$(eval "printf '%s' \"\${$var:-}\"")"
   if [ -z "$value" ]; then
     echo "ERROR: required env var missing: $var" >&2
@@ -366,7 +454,7 @@ for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME RUSTUP_HOME; do
   fi
 done
 
-for bin in mise node uv codex claude; do
+for bin in mise node uv codex claude cargo-binstall sccache cargo-nextest bacon cargo-watch cargo-add cargo-upgrade cargo-llvm-cov mold lld clang cmake ninja protoc; do
   if ! command -v "$bin" >/dev/null 2>&1; then
     echo "ERROR: required command not found on PATH: $bin" >&2
     fail=1
@@ -380,6 +468,27 @@ for bin in cargo rustc; do
     fail=1
   fi
 done
+
+if ! sccache --show-stats >/dev/null 2>&1; then
+  echo "ERROR: sccache is installed but not runnable" >&2
+  fail=1
+fi
+
+if ! cargo config get build.rustc-wrapper >/dev/null 2>&1; then
+  echo "ERROR: cargo config lookup failed for build.rustc-wrapper" >&2
+  fail=1
+fi
+
+if [ "$(cargo config get build.rustc-wrapper --format=json 2>/dev/null | jq -r '.value')" != "/usr/local/bin/sccache" ]; then
+  echo "ERROR: cargo build.rustc-wrapper is not configured for sccache" >&2
+  fail=1
+fi
+
+linker_value="$(cargo config get target.x86_64-unknown-linux-gnu.linker --format=json 2>/dev/null | jq -r '.value // empty')"
+if [ -n "$linker_value" ] && [ "$linker_value" != "/usr/local/bin/cc-mold" ]; then
+  echo "ERROR: cargo x86_64 Linux linker is not configured for mold" >&2
+  fail=1
+fi
 
 if [ "$fail" -ne 0 ]; then
   echo "codex env verification failed" >&2

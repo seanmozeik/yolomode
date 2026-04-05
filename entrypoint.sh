@@ -6,10 +6,45 @@ set -e
 # Lock PATH explicitly — prevents drift when Codex spawns non-interactive subshells
 # that may source login files resetting PATH to system defaults.
 export PATH="/opt/agent-browser/bin:/home/yolo/.cargo/bin:/home/yolo/go/bin:/home/yolo/.local/bin:/usr/local/bun/bin:/opt/mise/shims:/opt/cargo/bin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+export RUSTUP_HOME=/home/yolo/.rustup
+export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/home/yolo/.cache/cargo-target/default}"
+export RUSTC_WRAPPER=/usr/local/bin/sccache
+export SCCACHE_DIR=/home/yolo/.cache/sccache
+export SCCACHE_CACHE_SIZE=10G
+export CARGO_INCREMENTAL=1
+
+if [ -z "$LIBCLANG_PATH" ]; then
+  for dir in /usr/lib/llvm-*/lib; do
+    if [ -d "$dir" ]; then
+      export LIBCLANG_PATH="$dir"
+      break
+    fi
+  done
+fi
 
 # Fall back only when the incoming TERM has no terminfo entry in the image.
 if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then
   export TERM=xterm-256color
+fi
+
+mkdir -p \
+  "$HOME/.cargo/bin" \
+  "$HOME/.cargo/git" \
+  "$HOME/.cargo/registry" \
+  "$HOME/.rustup" \
+  "$CARGO_TARGET_DIR" \
+  "$HOME/.cache/sccache" \
+  "$HOME/.cache/uv" \
+  "$HOME/.cache/npm" \
+  "$HOME/.cache/pip" \
+  "$HOME/.local/bin" \
+  "$HOME/go/bin"
+sccache --start-server >/dev/null 2>&1 || true
+
+# Seed a writable rustup home from the image's preinstalled toolchain so a
+# mounted volume does not mask the working Rust installation.
+if [ ! -e "$RUSTUP_HOME/settings.toml" ] && [ -d /opt/rustup ]; then
+  rsync -a /opt/rustup/ "$RUSTUP_HOME"/
 fi
 
 # Copy staged Claude auth files into home dir
