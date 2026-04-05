@@ -474,19 +474,21 @@ if ! sccache --show-stats >/dev/null 2>&1; then
   fail=1
 fi
 
-if ! cargo config get build.rustc-wrapper >/dev/null 2>&1; then
-  echo "ERROR: cargo config lookup failed for build.rustc-wrapper" >&2
+if [ "${RUSTC_WRAPPER:-}" != "/usr/local/bin/sccache" ]; then
+  echo "ERROR: RUSTC_WRAPPER is not configured for sccache" >&2
   fail=1
 fi
 
-if [ "$(cargo config get build.rustc-wrapper --format=json 2>/dev/null | jq -r '.value')" != "/usr/local/bin/sccache" ]; then
-  echo "ERROR: cargo build.rustc-wrapper is not configured for sccache" >&2
+if [ ! -f "$CARGO_HOME/config.toml" ]; then
+  echo "ERROR: cargo config file missing: $CARGO_HOME/config.toml" >&2
+  fail=1
+elif ! grep -F 'rustc-wrapper = "/usr/local/bin/sccache"' "$CARGO_HOME/config.toml" >/dev/null 2>&1; then
+  echo "ERROR: cargo config file is missing sccache rustc-wrapper" >&2
   fail=1
 fi
 
-linker_value="$(cargo config get target.x86_64-unknown-linux-gnu.linker --format=json 2>/dev/null | jq -r '.value // empty')"
-if [ -n "$linker_value" ] && [ "$linker_value" != "/usr/local/bin/cc-mold" ]; then
-  echo "ERROR: cargo x86_64 Linux linker is not configured for mold" >&2
+if [ -f "$CARGO_HOME/config.toml" ] && ! grep -F 'linker = "/usr/local/bin/cc-mold"' "$CARGO_HOME/config.toml" >/dev/null 2>&1; then
+  echo "ERROR: cargo config file is missing mold linker config" >&2
   fail=1
 fi
 
