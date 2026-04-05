@@ -11,7 +11,6 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/home/yolo/.cache/cargo-target/defa
 export RUSTC_WRAPPER=/usr/local/bin/sccache
 export SCCACHE_DIR=/home/yolo/.cache/sccache
 export SCCACHE_CACHE_SIZE=10G
-export CARGO_INCREMENTAL=1
 
 if [ -z "$LIBCLANG_PATH" ]; then
   for dir in /usr/lib/llvm-*/lib; do
