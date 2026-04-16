@@ -105,6 +105,11 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm fresh-editor
 
+FROM cargo-base AS tool-yazi
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm yazi-fm --target aarch64-unknown-linux-musl
+
 # ---- lazygit (direct GitHub release) ----
 FROM alpine:3.23 AS tool-lazygit
 RUN apk add --no-cache curl tar gzip
@@ -252,6 +257,7 @@ COPY --from=tool-cargo-llvm-cov /root/.cargo/bin/cargo-llvm-cov /usr/local/bin/
 COPY --from=tool-cargo-watch /root/.cargo/bin/cargo-watch /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
+COPY --from=tool-yazi /root/.cargo/bin/yazi /usr/local/bin/
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -323,6 +329,16 @@ def "nu-complete just" [] {
 export extern "just" [
     ...recipe: string@"nu-complete just", # Recipe(s) to run, may be with argument(s)
 ]
+
+def --env y [...args] {
+	let tmp = (mktemp -t "yazi-cwd.XXXXXX")
+	yazi ...$args --cwd-file $tmp
+	let cwd = (open $tmp)
+	if $cwd != "" and $cwd != $env.PWD {
+		cd $cwd
+	}
+	rm -fp $tmp
+}
 NUEOF
 RUN chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
 
