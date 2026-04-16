@@ -241,6 +241,7 @@ export async function cmdRun(args: string[]): Promise<void> {
 
   const cols = process.stdout.columns || 80;
   const rows = process.stdout.rows || 24;
+  const hostTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   // Start detached so we can copy imports before handing over the shell
   const dockerArgs = [
@@ -289,6 +290,8 @@ export async function cmdRun(args: string[]): Promise<void> {
     'TERM_PROGRAM_VERSION',
     '-e',
     `COLUMNS=${cols}`,
+    '-e',
+    `TZ=${hostTimeZone}`,
     '-e',
     `LINES=${rows}`,
     ...(gitName ? ['-e', `GIT_AUTHOR_NAME=${gitName}`, '-e', `GIT_COMMITTER_NAME=${gitName}`] : []),
