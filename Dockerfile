@@ -63,7 +63,7 @@ RUN --mount=type=secret,id=gh_token \
 FROM cargo-base AS tool-cargo-insta
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
-    cargo-binstall --no-confirm cargo-insta
+    cargo-binstall --no-confirm cargo-insta@1.46.3
 
 FROM cargo-base AS tool-cargo-nextest
 RUN --mount=type=secret,id=gh_token \
