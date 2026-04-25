@@ -4,8 +4,10 @@ build:
   rm -f .*.bun-build
 
 # Install to /usr/local/bin
-install: build
+install-cli: build
   cp yolomode /usr/local/bin/yolomode
+  codesign --remove-signature /usr/local/bin/yolomode
+  codesign --force --sign - /usr/local/bin/yolomode
   @echo "Installed yolomode to /usr/local/bin/yolomode"
 
 # Run in dev mode (no compile)

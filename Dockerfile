@@ -200,6 +200,7 @@ RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
 RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g effect-solutions
+RUN bun install -g opensrc
 
 # ---- Final runtime ----
 FROM bitnami/minideb:trixie AS runtime
@@ -230,7 +231,7 @@ RUN install_packages \
     patch rsync \
     gh mise \
     ncurses-bin ncurses-term \
-    libncurses5 \
+    libncurses6 \
     coreutils findutils grep \
     zsh-autosuggestions zsh-syntax-highlighting \
     chromium \
