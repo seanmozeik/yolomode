@@ -110,7 +110,7 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm yazi-fm --target aarch64-unknown-linux-musl
 
-FROM bitnami/minideb:bookworm AS tool-rtk
+FROM bitnami/minideb:trixie AS tool-rtk
 RUN install_packages curl ca-certificates tar
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
@@ -145,7 +145,7 @@ ENV npm_config_prefix=/opt/agent-browser
 RUN npm install -g agent-browser
 
 # ---- Language runtimes via mise (each on its own layer for caching) ----
-FROM bitnami/minideb:bookworm AS mise-tools
+FROM bitnami/minideb:trixie AS mise-tools
 RUN install_packages \
     bash curl xz-utils build-essential gpg ca-certificates \
     zlib1g-dev libffi-dev libssl-dev libreadline-dev libbz2-dev libsqlite3-dev liblzma-dev linux-libc-dev
@@ -172,14 +172,14 @@ RUN --mount=type=secret,id=gh_token \
     mise use -g python@3.14
 
 # ---- Claude Code (official native installer) ----
-FROM bitnami/minideb:bookworm AS claude-install
+FROM bitnami/minideb:trixie AS claude-install
 RUN install_packages curl bash ca-certificates
 ENV HOME=/opt/claude-home
 RUN mkdir -p /opt/claude-home \
     && curl -fsSL https://claude.ai/install.sh | bash
 
 # ---- Bun base (shared by bun tool stages) ----
-FROM bitnami/minideb:bookworm AS bun-base
+FROM bitnami/minideb:trixie AS bun-base
 RUN install_packages curl bash ca-certificates unzip
 ENV BUN_INSTALL=/usr/local/bun
 ENV PATH="$BUN_INSTALL/bin:$PATH"
@@ -202,7 +202,7 @@ RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g effect-solutions
 
 # ---- Final runtime ----
-FROM bitnami/minideb:bookworm AS runtime
+FROM bitnami/minideb:trixie AS runtime
 
 # Add mise and gh apt repos, then install all system packages
 RUN install_packages gpg curl ca-certificates \
