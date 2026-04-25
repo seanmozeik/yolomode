@@ -3,7 +3,7 @@
 // Reads prd.json, picks highest-priority incomplete story, implements, tests, commits.
 // Repeats until all stories are complete or max iterations reached.
 //
-// Usage: ralph <claude|codex> [--max N] [prd-file...] [-- <agent args...>]
+// Usage: ralph <claude|codex|pi> [--max N] [prd-file...] [-- <agent args...>]
 
 // ── placeholder: replace with real ASCII art ──────────────────────────────────
 const BANNER = `
@@ -49,8 +49,8 @@ function makePrompt(prdFile: string): string {
 const argv = process.argv.slice(2);
 
 const agent = argv[0];
-if (!agent || (agent !== 'claude' && agent !== 'codex')) {
-  console.error('usage: ralph <claude|codex> [--max N] [prd-file...] [-- <agent args...>]');
+if (!agent || (agent !== 'claude' && agent !== 'codex' && agent !== 'pi')) {
+  console.error('usage: ralph <claude|codex|pi> [--max N] [prd-file...] [-- <agent args...>]');
   process.exit(1);
 }
 
@@ -124,10 +124,14 @@ async function runLoop(prdFile: string, label: string | null): Promise<boolean> 
     }
 
     const prompt = makePrompt(prdFile);
-    const agentCmd =
-      agent === 'claude'
-        ? ['claude', '--dangerously-skip-permissions', '--print', ...extraArgs, prompt]
-        : ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', ...extraArgs, prompt];
+    let agentCmd: string[];
+    if (agent === 'claude') {
+      agentCmd = ['claude', '--dangerously-skip-permissions', '--print', ...extraArgs, prompt];
+    } else if (agent === 'codex') {
+      agentCmd = ['codex', 'exec', '--dangerously-bypass-approvals-and-sandbox', ...extraArgs, prompt];
+    } else {
+      agentCmd = ['pi', '--print', '--no-session', ...extraArgs, prompt];
+    }
 
     const proc = Bun.spawn(agentCmd, {
       stderr: 'inherit',

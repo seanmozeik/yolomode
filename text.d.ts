@@ -22,3 +22,8 @@ declare module "*.terminfo" {
 	const content: string;
 	export default content;
 }
+
+declare module "*/vendor/ddg" {
+	const path: string;
+	export default path;
+}

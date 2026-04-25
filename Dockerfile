@@ -1,5 +1,5 @@
 # ==================================================
-# yolomode: Debian + kitchen-sink dev tools + Claude Code + Codex
+# yolomode: Debian + kitchen-sink dev tools + Claude Code + Codex + Pi Agent
 # ==================================================
 
 # ---- Cargo base (shared by Rust tool stages) ----
@@ -110,6 +110,25 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm yazi-fm --target aarch64-unknown-linux-musl
 
+FROM bitnami/minideb:bookworm AS tool-rtk
+RUN install_packages curl ca-certificates tar
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    ARCH=$(uname -m) && \
+    case "$ARCH" in \
+      x86_64) TRIPLE="x86_64-unknown-linux-musl" ;; \
+      aarch64) TRIPLE="aarch64-unknown-linux-gnu" ;; \
+      *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;; \
+    esac && \
+    LATEST=$(curl -fsSL "https://api.github.com/repos/rtk-ai/rtk/releases/latest" \
+      | awk -F'"' '/"tag_name"/ && !seen++ {v=$4} END {print v}') && \
+    curl -fsSL "https://github.com/rtk-ai/rtk/releases/download/${LATEST}/rtk-${TRIPLE}.tar.gz" \
+      -o /tmp/rtk.tar.gz && \
+    tar -xzf /tmp/rtk.tar.gz -C /tmp && \
+    RTK_BIN=$(find /tmp -maxdepth 2 -name 'rtk' -type f -print -quit) && \
+    cp "$RTK_BIN" /usr/local/bin/rtk && \
+    chmod +x /usr/local/bin/rtk
+
 # ---- lazygit (direct GitHub release) ----
 FROM alpine:3.23 AS tool-lazygit
 RUN apk add --no-cache curl tar gzip
@@ -170,13 +189,17 @@ RUN curl -fsSL https://bun.sh/install | BUN_INSTALL=/usr/local/bun bash
 FROM bun-base AS codex-install
 RUN bun install -g @openai/codex
 
+# ---- Pi Agent (own stage so --no-cache-filter can target it) ----
+FROM bun-base AS pi-install
+RUN bun install -g @mariozechner/pi-coding-agent
+
 # ---- Bun dev tools (cached normally) ----
 FROM bun-base AS bun-tools
 RUN bun install -g oxfmt oxlint oxlint-tsgolint typescript
 RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
 RUN bun install -g @seanmozeik/claudewatch
-RUN bun install -g opencode-ai
+RUN bun install -g effect-solutions
 
 # ---- Final runtime ----
 FROM bitnami/minideb:bookworm AS runtime
@@ -258,6 +281,9 @@ COPY --from=tool-cargo-watch /root/.cargo/bin/cargo-watch /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
 COPY --from=tool-yazi /root/.cargo/bin/yazi /usr/local/bin/
+COPY --from=tool-rtk /usr/local/bin/rtk /usr/local/bin/
+COPY vendor/ddg /usr/local/bin/ddg
+RUN chmod +x /usr/local/bin/ddg
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -267,6 +293,7 @@ COPY --from=claude-install /opt/claude-home/.local/share/claude /opt/claude
 RUN ln -s /opt/claude/versions/$(ls /opt/claude/versions/) /usr/local/bin/claude
 COPY --from=bun-tools /usr/local/bun /usr/local/bun
 COPY --from=codex-install /usr/local/bun /usr/local/bun
+COPY --from=pi-install /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup
 COPY --from=mise-tools /opt/cargo /opt/cargo
@@ -293,6 +320,7 @@ RUN printf '%s\n' \
     'precmd_functions+=(_ym_title)' \
     'alias cc="claude"' \
     'alias co="codex"' \
+    'alias piagent="pi"' \
     'alias cw="claudewatch"' \
     'alias lg="lazygit"' \
     >> /home/yolo/.zshrc \
@@ -301,6 +329,7 @@ RUN printf '%s\n' \
     'eval "$(starship init bash)"' \
     'alias cc="claude"' \
     'alias co="codex"' \
+    'alias piagent="pi"' \
     'alias cw="claudewatch"' \
     'alias lg="lazygit"' \
     >> /home/yolo/.bashrc
@@ -316,6 +345,7 @@ RUN mkdir -p /home/yolo/.config/nushell \
     '$env.VISUAL = "micro"' \
     'alias cc = claude' \
     'alias co = codex' \
+    'alias piagent = pi' \
     'alias cw = claudewatch' \
     'alias lg = lazygit' \
     'alias .. = cd ..' \
@@ -350,6 +380,7 @@ RUN mkdir -p /usr/local/share/npm-global && \
 COPY starship.toml /home/yolo/.config/starship.toml
 RUN VERSION=$(ls /opt/claude/versions/) \
     && mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
+       /home/yolo/.pi/agent /home/yolo/.pi/agent/sessions /home/yolo/.pi/agent/bin \
        /home/yolo/.cargo/bin /home/yolo/.cargo/git /home/yolo/.cargo/registry \
        /home/yolo/.rustup \
        /home/yolo/.cache/sccache /home/yolo/go/bin \
@@ -367,6 +398,11 @@ RUN VERSION=$(ls /opt/claude/versions/) \
        'exec /usr/local/bun/bin/codex --dangerously-bypass-approvals-and-sandbox --no-alt-screen "$@"' \
        > /home/yolo/.local/bin/codex \
     && chmod +x /home/yolo/.local/bin/codex
+RUN printf '%s\n' \
+       '#!/bin/sh' \
+       'exec /usr/local/bun/bin/pi "$@"' \
+       > /home/yolo/.local/bin/pi \
+    && chmod +x /home/yolo/.local/bin/pi
 RUN cat <<'EOF' > /home/yolo/.cargo/config.toml
 [build]
 rustc-wrapper = "/usr/local/bin/sccache"
@@ -387,6 +423,74 @@ debug = 1
 nt = "nextest run"
 nw = "nextest run --workspace"
 EOF
+RUN cat <<'EOF' > /home/yolo/.codex/RTK.md
+# RTK - Rust Token Killer (Codex CLI)
+
+**Usage**: Token-optimized CLI proxy for shell commands.
+
+## Rule
+
+Always prefix shell commands with `rtk`.
+
+Examples:
+
+```bash
+rtk git status
+rtk cargo test
+rtk npm run build
+rtk pytest -q
+```
+
+## Meta Commands
+
+```bash
+rtk gain            # Token savings analytics
+rtk gain --history  # Recent command savings history
+rtk proxy <cmd>     # Run raw command without filtering
+```
+
+## Verification
+
+```bash
+rtk --version
+rtk gain
+which rtk
+```
+EOF
+RUN cat <<'EOF' > /home/yolo/.claude/RTK.md
+# RTK - Rust Token Killer
+
+**Usage**: Token-optimized CLI proxy (60-90% savings on dev operations)
+
+## Meta Commands (always use rtk directly)
+
+```bash
+rtk gain              # Show token savings analytics
+rtk gain --history    # Show command usage history with savings
+rtk discover          # Analyze Claude Code history for missed opportunities
+rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
+```
+
+## Installation Verification
+
+```bash
+rtk --version         # Should show: rtk X.Y.Z
+rtk gain              # Should work (not "command not found")
+which rtk             # Verify correct binary
+```
+
+⚠️ **Name collision**: If `rtk gain` fails, you may have reachingforthejack/rtk (Rust Type Kit) installed instead.
+
+## Hook-Based Usage
+
+All other commands are automatically rewritten by the Claude Code hook.
+Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
+
+Refer to CLAUDE.md for full command reference.
+EOF
+RUN cp /home/yolo/.codex/RTK.md /home/yolo/.pi/agent/RTK.md \
+    && printf '%s\n' '@RTK.md' > /home/yolo/.codex/AGENTS.md \
+    && printf '%s\n' '@RTK.md' > /home/yolo/.pi/agent/AGENTS.md
 RUN chown -R yolo:yolo /home/yolo
 
 RUN cat <<'EOF' >/usr/local/bin/cc-mold
@@ -472,7 +576,7 @@ for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME CARGO_TARGET_DIR R
   fi
 done
 
-for bin in mise node uv codex claude cargo-binstall sccache cargo-nextest bacon cargo-watch cargo-add cargo-upgrade cargo-llvm-cov mold lld clang cmake ninja protoc; do
+for bin in mise node uv codex claude pi rtk ddg cargo-binstall sccache cargo-nextest bacon cargo-watch cargo-add cargo-upgrade cargo-llvm-cov mold lld clang cmake ninja protoc; do
   if ! command -v "$bin" >/dev/null 2>&1; then
     echo "ERROR: required command not found on PATH: $bin" >&2
     fail=1

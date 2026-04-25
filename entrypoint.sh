@@ -68,6 +68,23 @@ if [ -f /host-codex/config.toml ]; then
   cp /host-codex/config.toml "$HOME/.codex/config.toml"
 fi
 
+# Copy Pi Agent config from host mount. These are preprocessed by the CLI so
+# host-local model URLs work from inside Docker.
+if [ -d /host-pi/agent ]; then
+  mkdir -p "$HOME/.pi/agent"
+  for pi_file in settings.json models.json auth.json keybindings.json AGENTS.md CLAUDE.md RTK.md; do
+    if [ -f "/host-pi/agent/$pi_file" ]; then
+      cp "/host-pi/agent/$pi_file" "$HOME/.pi/agent/$pi_file"
+    fi
+  done
+  for pi_dir in prompts themes tools; do
+    if [ -d "/host-pi/agent/$pi_dir" ]; then
+      rm -rf "$HOME/.pi/agent/$pi_dir"
+      cp -a "/host-pi/agent/$pi_dir" "$HOME/.pi/agent/$pi_dir"
+    fi
+  done
+fi
+
 # Propagate host git identity into container's global config
 if [ -n "$GIT_AUTHOR_NAME" ]; then
   git config --global user.name "$GIT_AUTHOR_NAME"

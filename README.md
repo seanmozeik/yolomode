@@ -1,6 +1,6 @@
 # yolomode
 
-Run Claude Code or Codex inside disposable Alpine containers. Each session gets its own copy of your repo. If the agent wrecks the git history or deletes half the codebase, your host machine never knows.
+Run Claude Code, Codex, or Pi Agent inside disposable containers. Each session gets its own copy of your repo. If the agent wrecks the git history or deletes half the codebase, your host machine never knows.
 
 Sessions run in parallel. Launch five at once, each working a different problem, then cherry-pick the results.
 
@@ -10,6 +10,7 @@ Sessions run in parallel. Launch five at once, each working a different problem,
 - [Bun](https://bun.sh) (for building from source)
 - Claude Code authenticated on your Mac (`claude login`)
 - Codex authenticated on your Mac (`codex login`), if using Codex
+- Pi Agent authenticated/configured on your Mac (`pi`), if using Pi Agent
 
 ## Install
 
@@ -28,7 +29,7 @@ This compiles the CLI to a single binary and copies it to `/usr/local/bin/yolomo
 yolomode build
 ```
 
-First build pulls Alpine, installs mise (python, go, zig, rust), Bun, Claude Code, Codex, ripgrep, fd, sd, starship, and the usual build tools. Takes a few minutes. Subsequent builds hit cache.
+First build pulls Debian, installs mise (python, go, zig, rust), Bun, Claude Code, Codex, Pi Agent, RTK, the vendored `ddg` binary, ripgrep, fd, sd, starship, and the usual build tools. Takes a few minutes. Subsequent builds hit cache.
 
 ### Start a session
 
@@ -36,13 +37,14 @@ First build pulls Alpine, installs mise (python, go, zig, rust), Bun, Claude Cod
 yolomode run
 ```
 
-This creates a named container (e.g., `swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials for both Claude and Codex, and drops you into a zsh shell. The terminal window title is set to `ym-swift-fox` for easy tab identification.
+This creates a named container (e.g., `swift-fox`), copies your repo into it (respecting `.gitignore`), injects credentials/config for Claude, Codex, and Pi Agent, and drops you into a shell. The terminal window title is set to `ym-swift-fox` for easy tab identification.
 
 From there, install deps, poke around, and launch whichever agent you want:
 
 ```
 claude --dangerously-skip-permissions
 codex --dangerously-bypass-approvals-and-sandbox
+pi
 ```
 
 #### Import files into a session
@@ -151,6 +153,7 @@ yolomode ralph claude swift-fox --max 20
 yolomode ralph claude swift-fox prd1.json prd2.json
 yolomode ralph codex -- --model gpt-5-codex
 yolomode ralph codex --max 20 -- --model gpt-5-codex
+yolomode ralph pi -- --model lmstudio/qwen
 ```
 
 This runs the loop from your host machine, targeting a named container. Output streams in real time. Defaults to 10 iterations. If only one session is running, the name is optional. Agent-specific flags can be passed after `--`.
@@ -165,6 +168,7 @@ ralph claude --max 20                # custom iteration limit
 ralph claude prd1.json prd2.json     # two PRDs in parallel
 ralph claude -- --model sonnet       # pass --model to the agent via --
 ralph codex -- --model gpt-5-codex
+ralph pi -- --model lmstudio/qwen
 ```
 
 #### Parallel PRD loops
@@ -255,6 +259,10 @@ Place a `settings.json` at `~/.config/yolomode/settings.json` (or `$XDG_CONFIG_H
 
 Place a `config.toml` at `~/.config/yolomode/config.toml` (or `$XDG_CONFIG_HOME/yolomode/config.toml`) to inject Codex settings into every session. This file is copied into the container as `~/.codex/config.toml`.
 
+### Pi Agent settings
+
+Yolomode copies `~/.pi/agent` into each session, including `settings.json`, `models.json`, `auth.json`, prompts, themes, tools, and the extension package list in `settings.json`. Session history is not copied. NPM packages listed as Pi extensions are copied from the host global npm root into the container's global npm root so Pi can load the same extensions without reinstalling them. Local model URLs such as `http://localhost:1234/v1` are rewritten to `http://host.docker.internal:1234/v1` so Pi Agent can reach host services from inside Docker.
+
 ### What gets mounted
 
 | Host path | Container path | Notes |
@@ -262,8 +270,13 @@ Place a `config.toml` at `~/.config/yolomode/config.toml` (or `$XDG_CONFIG_HOME/
 | `~/.claude/skills/` | `~/.claude/skills/` | Read-only, plus bundled ralph skill |
 | `~/.claude/plugins/` | `~/.claude/plugins/` | Read-only |
 | `~/.claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Read-only |
+| `~/.claude/RTK.md` | `~/.claude/RTK.md` | Read-only, if present |
+| `~/.codex/AGENTS.md` | `~/.codex/AGENTS.md` | Preprocessed so `@RTK.md` resolves in-container |
+| `~/.codex/RTK.md` | `~/.codex/RTK.md` | Read-only, if present |
 | `~/.config/yolomode/settings.json` | `~/.claude/settings.json` | Copied by entrypoint |
 | `~/.config/yolomode/config.toml` | `~/.codex/config.toml` | Copied by entrypoint |
+| `~/.pi/agent/` | `~/.pi/agent/` | Preprocessed; sessions omitted; local model URLs rewritten; RTK context added |
+| Host global npm Pi extension packages | `~/.local/lib/node_modules/` | Copied from packages listed in `~/.pi/agent/settings.json` |
 | `~/.config/starship.toml` | `~/.config/starship.toml` | Read-only |
 | `~/.claude.json` | `~/.claude.json` | Preprocessed (installMethod stripped) |
 
@@ -288,13 +301,15 @@ verify-codex-env.sh
 
 Claude Code: OAuth tokens extracted from the macOS keychain and injected into the container.
 Codex: `~/.codex/auth.json` read from disk and injected.
+Pi Agent: `~/.pi/agent/auth.json` read from disk and injected.
 Both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are passed through from host env if set.
 
 ## What's in the box
 
 Installed via mise: python 3.13, go, zig, rust, uv.
 Installed via apk: node, git, curl, jq, zsh, build-base, openssh, github-cli.
-Installed via Bun: Claude Code, Codex.
+Installed via Bun: Claude Code, Codex, Pi Agent.
+Installed from release/vendor binaries: RTK, ddg.
 Installed via cargo-binstall: ripgrep, fd, sd, starship.
 Your starship.toml is mounted into the container if it exists.
 

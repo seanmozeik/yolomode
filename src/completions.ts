@@ -35,9 +35,9 @@ _yolomode() {
             COMPREPLY=( $(compgen -W "--import --memory --port --no-cache" -- "$cur") )
             ;;
         ralph)
-            COMPREPLY=( $(compgen -W "claude codex" -- "$cur") )
+            COMPREPLY=( $(compgen -W "claude codex pi" -- "$cur") )
             ;;
-        claude|codex)
+        claude|codex|pi)
             if [[ "\${COMP_WORDS[1]}" == "ralph" ]]; then
                 local sessions
                 sessions=$(yolomode --complete sessions 2>/dev/null)
@@ -108,7 +108,7 @@ _yolomode() {
                     local -a sessions
                     sessions=(\${(f)"$(yolomode --complete sessions 2>/dev/null)"})
                     _arguments \\
-                        '1:agent:(claude codex)' \\
+                        '1:agent:(claude codex pi)' \\
                         '2:session:compadd -a sessions' \\
                         '--max[Max loop iterations]:count:'
                     ;;
@@ -146,7 +146,7 @@ complete -c yolomode -n '__fish_seen_subcommand_from attach diff apply sync rm' 
 complete -c yolomode -n '__fish_seen_subcommand_from forward; and __fish_is_nth_token 3' -a '(yolomode --complete sessions 2>/dev/null)' -f
 
 # ralph: agent, session names, flags
-complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a 'claude codex' -f
+complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a 'claude codex pi' -f
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -a '(yolomode --complete sessions 2>/dev/null)' -f
 complete -c yolomode -n '__fish_seen_subcommand_from ralph' -l max -d 'Max loop iterations'
 
@@ -195,7 +195,7 @@ def "nu complete yolomode shells" [] {
 }
 
 def "nu complete yolomode agents" [] {
-    ["claude" "codex"]
+    ["claude" "codex" "pi"]
 }
 `;
 

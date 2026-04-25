@@ -3,10 +3,10 @@ import { die, ensureRunning, getFlags, getWorkDir, resolveSession } from './util
 
 export { RALPH };
 
-type RalphAgent = 'claude' | 'codex';
+type RalphAgent = 'claude' | 'codex' | 'pi';
 
 function isRalphAgent(value: string): value is RalphAgent {
-  return value === 'claude' || value === 'codex';
+  return value === 'claude' || value === 'codex' || value === 'pi';
 }
 
 export async function cmdRalph(args: string[]): Promise<void> {
@@ -16,7 +16,9 @@ export async function cmdRalph(args: string[]): Promise<void> {
 
   const agent = baseArgs[1];
   if (!agent || !isRalphAgent(agent)) {
-    die('usage: yolomode ralph <claude|codex> [name] [--max N] [prd-file...] [-- <agent args...>]');
+    die(
+      'usage: yolomode ralph <claude|codex|pi> [name] [--max N] [prd-file...] [-- <agent args...>]'
+    );
   }
 
   let sessionArg: string | undefined;
@@ -35,7 +37,7 @@ export async function cmdRalph(args: string[]): Promise<void> {
     }
     if (sessionArg) {
       die(
-        'usage: yolomode ralph <claude|codex> [name] [--max N] [prd-file...] [-- <agent args...>]'
+        'usage: yolomode ralph <claude|codex|pi> [name] [--max N] [prd-file...] [-- <agent args...>]'
       );
     }
     sessionArg = token;

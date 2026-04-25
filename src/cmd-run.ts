@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import boxen from 'boxen';
 import { $ } from 'bun';
 import ora from 'ora';
@@ -45,6 +45,159 @@ async function preprocessClaudeConfig(srcPath: string): Promise<string> {
   } catch {
     return '';
   }
+}
+
+function hasClaudeRtkHook(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks;
+  if (!hooks || typeof hooks !== 'object') return false;
+  const preToolUse = (hooks as Record<string, unknown>).PreToolUse;
+  if (!Array.isArray(preToolUse)) return false;
+  return preToolUse.some((entry) => {
+    if (!entry || typeof entry !== 'object') return false;
+    const record = entry as Record<string, unknown>;
+    if (record.matcher !== 'Bash') return false;
+    const entryHooks = record.hooks;
+    if (!Array.isArray(entryHooks)) return false;
+    return entryHooks.some((hook) => {
+      if (!hook || typeof hook !== 'object') return false;
+      const hookRecord = hook as Record<string, unknown>;
+      return hookRecord.type === 'command' && hookRecord.command === 'rtk hook claude';
+    });
+  });
+}
+
+async function preprocessClaudeSettings(srcPath: string | null): Promise<string> {
+  let settings: Record<string, unknown> = {};
+  if (srcPath) {
+    try {
+      settings = JSON.parse(await readFile(srcPath, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      settings = {};
+    }
+  }
+
+  if (!hasClaudeRtkHook(settings)) {
+    const hooks =
+      settings.hooks && typeof settings.hooks === 'object'
+        ? (settings.hooks as Record<string, unknown>)
+        : {};
+    const preToolUse = Array.isArray(hooks.PreToolUse) ? hooks.PreToolUse : [];
+    hooks.PreToolUse = [
+      ...preToolUse,
+      {
+        hooks: [{ command: 'rtk hook claude', type: 'command' }],
+        matcher: 'Bash'
+      }
+    ];
+    settings.hooks = hooks;
+  }
+
+  const tmpDir = join(HOME, '.yolomode', 'tmp');
+  await $`mkdir -p ${tmpDir}`.quiet();
+  const tmpPath = join(tmpDir, 'claude-settings.json');
+  await writeFile(tmpPath, `${JSON.stringify(settings, null, 2)}\n`, { mode: 0o644 });
+  return tmpPath;
+}
+
+function rewriteLocalhostUrls(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return value
+      .replaceAll('://localhost', '://host.docker.internal')
+      .replaceAll('://127.0.0.1', '://host.docker.internal')
+      .replaceAll('://0.0.0.0', '://host.docker.internal');
+  }
+  if (Array.isArray(value)) {
+    return value.map(rewriteLocalhostUrls);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [key, rewriteLocalhostUrls(entry)])
+    );
+  }
+  return value;
+}
+
+async function preprocessPiAgentConfig(srcDir: string): Promise<string> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'yolomode-pi-'));
+  await $`mkdir -p ${tmpDir}/agent`.quiet();
+  await $`cp -R ${srcDir}/. ${tmpDir}/agent/`.quiet().nothrow();
+
+  const sessionsDir = join(tmpDir, 'agent', 'sessions');
+  await $`rm -rf ${sessionsDir}`.quiet().nothrow();
+  await $`mkdir -p ${sessionsDir}`.quiet();
+
+  for (const fname of ['settings.json', 'models.json', 'auth.json', 'keybindings.json']) {
+    const fpath = join(tmpDir, 'agent', fname);
+    try {
+      const data = await readFile(fpath, 'utf-8');
+      const parsed = JSON.parse(data);
+      const fixed = rewriteLocalhostUrls(parsed);
+      await writeFile(fpath, `${JSON.stringify(fixed, null, 2)}\n`, { mode: 0o600 });
+    } catch {
+      /* file may not exist or may not be JSON */
+    }
+  }
+
+  const hostRtkPath = join(HOME, '.codex', 'RTK.md');
+  const rtkPath = join(tmpDir, 'agent', 'RTK.md');
+  if (await Bun.file(hostRtkPath).exists()) {
+    await $`cp ${hostRtkPath} ${rtkPath}`.quiet().nothrow();
+  } else if (!(await Bun.file(rtkPath).exists())) {
+    await writeFile(rtkPath, 'Always prefix shell commands with `rtk`.\n', { mode: 0o644 });
+  }
+
+  const agentsPath = join(tmpDir, 'agent', 'AGENTS.md');
+  if (!(await Bun.file(agentsPath).exists())) {
+    await writeFile(agentsPath, '@RTK.md\n', { mode: 0o644 });
+  } else {
+    const agents = await readFile(agentsPath, 'utf-8');
+    if (!agents.includes('RTK.md')) {
+      await writeFile(agentsPath, `${agents.trimEnd()}\n@RTK.md\n`, { mode: 0o644 });
+    }
+  }
+
+  return tmpDir;
+}
+
+function piNpmPackageName(source: unknown): string | null {
+  if (typeof source !== 'string' || !source.startsWith('npm:')) return null;
+  const spec = source.slice('npm:'.length).trim();
+  if (!spec || /[^\w@./+-]/.test(spec)) return null;
+  if (spec.startsWith('@')) {
+    const parts = spec.split('/');
+    if (parts.length < 2) return null;
+    return `${parts[0]}/${parts[1].split('@')[0]}`;
+  }
+  return spec.split('@')[0] ?? null;
+}
+
+async function stagePiNpmPackages(settingsPath: string): Promise<string> {
+  const settings = JSON.parse(await readFile(settingsPath, 'utf-8')) as { packages?: unknown };
+  const packages = Array.isArray(settings.packages)
+    ? settings.packages.map(piNpmPackageName).filter((pkg): pkg is string => Boolean(pkg))
+    : [];
+
+  const tmpDir = await mkdtemp(join(tmpdir(), 'yolomode-pi-npm-'));
+  const nodeModules = join(tmpDir, 'node_modules');
+  await $`mkdir -p ${nodeModules}`.quiet();
+  if (packages.length === 0) return tmpDir;
+
+  const npmRoot = await $`npm root -g`
+    .quiet()
+    .nothrow()
+    .text()
+    .then((s) => s.trim());
+  if (!npmRoot) return tmpDir;
+
+  for (const pkg of packages) {
+    const src = join(npmRoot, pkg);
+    if (!(await dirExists(src))) continue;
+    const dest = join(nodeModules, pkg);
+    await $`mkdir -p ${dirname(dest)}`.quiet();
+    await $`cp -R ${src} ${dest}`.quiet().nothrow();
+  }
+
+  return tmpDir;
 }
 
 async function checkDockerMemory(): Promise<void> {
@@ -185,6 +338,10 @@ export async function cmdRun(args: string[]): Promise<void> {
   if (await Bun.file(claudeRootMd).exists()) {
     mounts.push('-v', `${claudeRootMd}:/home/yolo/.claude/CLAUDE.md:ro`);
   }
+  const claudeRtkMd = join(HOME, '.claude', 'RTK.md');
+  if (await Bun.file(claudeRtkMd).exists()) {
+    mounts.push('-v', `${claudeRtkMd}:/home/yolo/.claude/RTK.md:ro`);
+  }
 
   // --- Yolomode user settings (~/.config/yolomode/settings.json) ---
   const yolomodeSettings = join(
@@ -192,9 +349,10 @@ export async function cmdRun(args: string[]): Promise<void> {
     'yolomode',
     'settings.json'
   );
-  if (await Bun.file(yolomodeSettings).exists()) {
-    mounts.push('-v', `${yolomodeSettings}:/host-claude/settings.json:ro`);
-  }
+  const processedClaudeSettings = await preprocessClaudeSettings(
+    (await Bun.file(yolomodeSettings).exists()) ? yolomodeSettings : null
+  );
+  mounts.push('-v', `${processedClaudeSettings}:/host-claude/settings.json:ro`);
 
   // --- Codex auth ---
   const codexAuth = join(HOME, '.codex', 'auth.json');
@@ -208,6 +366,36 @@ export async function cmdRun(args: string[]): Promise<void> {
   );
   if (await Bun.file(yolomodeCodexConfig).exists()) {
     mounts.push('-v', `${yolomodeCodexConfig}:/host-codex/config.toml:ro`);
+  }
+  const codexRtkMd = join(HOME, '.codex', 'RTK.md');
+  if (await Bun.file(codexRtkMd).exists()) {
+    mounts.push('-v', `${codexRtkMd}:/home/yolo/.codex/RTK.md:ro`);
+  }
+  const codexAgentsMd = join(HOME, '.codex', 'AGENTS.md');
+  if (await Bun.file(codexAgentsMd).exists()) {
+    const tmp = await mkdtemp(join(tmpdir(), 'yolomode-codex-agents-'));
+    tmpdirs.push(tmp);
+    const data = await readFile(codexAgentsMd, 'utf-8');
+    const processed = data
+      .replaceAll(join(HOME, '.codex'), '/home/yolo/.codex')
+      .replaceAll(HOME, '/home/yolo');
+    const tmpPath = join(tmp, 'AGENTS.md');
+    await writeFile(tmpPath, processed, { mode: 0o644 });
+    mounts.push('-v', `${tmpPath}:/home/yolo/.codex/AGENTS.md:ro`);
+  }
+
+  // --- Pi Agent config/auth/extensions ---
+  const piAgentDir = join(HOME, '.pi', 'agent');
+  if (await dirExists(piAgentDir)) {
+    const processedPiDir = await preprocessPiAgentConfig(piAgentDir);
+    tmpdirs.push(processedPiDir);
+    mounts.push('-v', `${processedPiDir}:/host-pi:ro`);
+    const piSettings = join(processedPiDir, 'agent', 'settings.json');
+    if (await Bun.file(piSettings).exists()) {
+      const piNpmDir = await stagePiNpmPackages(piSettings);
+      tmpdirs.push(piNpmDir);
+      mounts.push('-v', `${join(piNpmDir, 'node_modules')}:/home/yolo/.local/lib/node_modules`);
+    }
   }
 
   // --- Host git identity ---
@@ -272,6 +460,8 @@ export async function cmdRun(args: string[]): Promise<void> {
     '-v',
     `${process.cwd()}:/src:ro`,
     ...mounts,
+    '--add-host',
+    'host.docker.internal:host-gateway',
     '-e',
     'ANTHROPIC_API_KEY',
     '-e',
