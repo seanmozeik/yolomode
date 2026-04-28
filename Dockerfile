@@ -3,15 +3,14 @@
 # ==================================================
 
 # ---- Cargo base (shared by Rust tool stages) ----
-# Alpine is fine here: cargo-binstall downloads statically-linked musl binaries
-# that run on any Linux, including glibc systems like the Debian runtime below.
-FROM alpine:3.23 AS cargo-base
-RUN apk add --no-cache curl bash
+FROM bitnami/minideb:trixie AS cargo-base
+RUN install_packages curl bash ca-certificates build-essential
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --no-modify-path
+ENV PATH="/root/.cargo/bin:${PATH}"
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     curl -L --proto '=https' --tlsv1.2 -sSf \
     https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-ENV PATH="/root/.cargo/bin:${PATH}"
 ENV BINSTALL_DISABLE_TELEMETRY=true
 
 # ---- Rust tools (BuildKit runs these in parallel) ----
@@ -108,7 +107,22 @@ RUN --mount=type=secret,id=gh_token \
 FROM cargo-base AS tool-yazi
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
-    cargo-binstall --no-confirm yazi-fm --target aarch64-unknown-linux-musl
+    cargo-binstall --no-confirm yazi-fm
+
+FROM cargo-base AS tool-ast-outline
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm ast-outline
+
+FROM cargo-base AS tool-cargo-audit
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm cargo-audit
+
+FROM cargo-base AS tool-jaq
+RUN --mount=type=secret,id=gh_token \
+    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
+    cargo-binstall --no-confirm jaq
 
 FROM bitnami/minideb:trixie AS tool-rtk
 RUN install_packages curl ca-certificates tar
@@ -201,6 +215,7 @@ RUN bun install -g @seanmozeik/markdown-display
 RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g effect-solutions
 RUN bun install -g opensrc
+RUN bun install -g @seanmozeik/ddg
 
 # ---- Final runtime ----
 FROM bitnami/minideb:trixie AS runtime
@@ -282,9 +297,10 @@ COPY --from=tool-cargo-watch /root/.cargo/bin/cargo-watch /usr/local/bin/
 COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
 COPY --from=tool-yazi /root/.cargo/bin/yazi /usr/local/bin/
+COPY --from=tool-ast-outline /root/.cargo/bin/ast-outline /usr/local/bin/
+COPY --from=tool-cargo-audit /root/.cargo/bin/cargo-audit /usr/local/bin/
+COPY --from=tool-jaq /root/.cargo/bin/jaq /usr/local/bin/
 COPY --from=tool-rtk /usr/local/bin/rtk /usr/local/bin/
-COPY vendor/ddg /usr/local/bin/ddg
-RUN chmod +x /usr/local/bin/ddg
 COPY --from=node /opt/bitnami/node /opt/bitnami/node
 RUN ln -s /opt/bitnami/node/bin/node /usr/local/bin/node \
     && ln -s /opt/bitnami/node/bin/npm /usr/local/bin/npm \
@@ -350,6 +366,7 @@ RUN mkdir -p /home/yolo/.config/nushell \
     'alias cw = claudewatch' \
     'alias lg = lazygit' \
     'alias .. = cd ..' \
+    'alias j = just' \
     >> /home/yolo/.config/nushell/config.nu \
     && cat <<'NUEOF' >> /home/yolo/.config/nushell/config.nu
 def "nu-complete just" [] {

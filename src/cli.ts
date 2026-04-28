@@ -12,7 +12,6 @@ import STARSHIP from '../config/starship.toml' with { type: 'text' };
 import GHOSTTY_TERMINFO from '../config/xterm-ghostty.terminfo' with { type: 'text' };
 import DOCKERFILE from '../Dockerfile' with { type: 'text' };
 import ENTRYPOINT from '../entrypoint.sh' with { type: 'text' };
-import DDG_BINARY from '../vendor/ddg' with { type: 'file' };
 import { cmdApply } from './cmd-apply';
 import { cmdForward } from './cmd-forward';
 import { cmdRalph, RALPH } from './cmd-ralph';
@@ -135,8 +134,6 @@ try {
           mode: 0o755
         });
         await writeFile(join(ctx, 'starship.toml'), STARSHIP);
-        await mkdir(join(ctx, 'vendor'), { recursive: true });
-        await Bun.write(join(ctx, 'vendor', 'ddg'), Bun.file(DDG_BINARY));
         const buildArgs = ['build', '-t', IMAGE];
         if (hasFlag(args, '--no-cache')) buildArgs.push('--no-cache');
         else buildArgs.push('--no-cache-filter=claude-install,codex-install,pi-install,tool-rtk');

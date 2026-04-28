@@ -29,7 +29,7 @@ This compiles the CLI to a single binary and copies it to `/usr/local/bin/yolomo
 yolomode build
 ```
 
-First build pulls Debian, installs mise (python, go, zig, rust), Bun, Claude Code, Codex, Pi Agent, RTK, the vendored `ddg` binary, ripgrep, fd, sd, starship, and the usual build tools. Takes a few minutes. Subsequent builds hit cache.
+First build pulls Debian, installs mise (python, go, zig, rust), Bun, Claude Code, Codex, Pi Agent, RTK, `ddg`, ripgrep, fd, sd, starship, and the usual build tools. Takes a few minutes. Subsequent builds hit cache.
 
 ### Start a session
 
@@ -308,8 +308,8 @@ Both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` are passed through from host env i
 
 Installed via mise: python 3.13, go, zig, rust, uv.
 Installed via apk: node, git, curl, jq, zsh, build-base, openssh, github-cli.
-Installed via Bun: Claude Code, Codex, Pi Agent.
-Installed from release/vendor binaries: RTK, ddg.
+Installed via Bun: Claude Code, Codex, Pi Agent, ddg.
+Installed from release binaries: RTK.
 Installed via cargo-binstall: ripgrep, fd, sd, starship.
 Your starship.toml is mounted into the container if it exists.
 
@@ -324,7 +324,7 @@ src/
   cmd-apply.ts    `apply` command (patch extraction and git workflow)
   cmd-ralph.ts    `ralph` command (autonomous loop + text imports)
   completions.ts  Shell completion scripts (bash, zsh, fish, nushell)
-Dockerfile        Multi-stage Alpine build
+Dockerfile        Multi-stage Debian build
 entrypoint.sh     Container startup (credential copy, repo init)
 ralph.sh          In-container autonomous loop script
 ```
