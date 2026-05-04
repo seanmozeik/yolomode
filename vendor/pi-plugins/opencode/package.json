@@ -1,0 +1,36 @@
+{
+  "description": "OpenCode provider extension for pi coding agent — Zen and Go models",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src/index.ts"
+  ],
+  "keywords": [
+    "ai",
+    "opencode",
+    "opencode-go",
+    "opencode-zen",
+    "pi",
+    "pi-extension",
+    "pi-package",
+    "provider"
+  ],
+  "license": "MIT",
+  "main": "src/index.ts",
+  "name": "pi-opencode",
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/awtotty/pi-opencode.git"
+  },
+  "type": "module",
+  "version": "1.0.0"
+}

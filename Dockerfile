@@ -158,6 +158,17 @@ FROM node AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser
 RUN npm install -g agent-browser
 
+# ---- Pi npm plugins (pre-installed at build time; avoids copying ~1GB at container start) ----
+FROM node AS pi-npm-plugins
+ENV npm_config_prefix=/opt/pi-npm
+RUN npm install -g \
+    pi-extension-manager \
+    pi-agent-browser-native \
+    "@sherif-fanous/pi-rtk" \
+    pi-smart-fetch \
+    pi-aliases \
+    pi-caveman
+
 # ---- Language runtimes via mise (each on its own layer for caching) ----
 FROM bitnami/minideb:trixie AS mise-tools
 RUN install_packages \
@@ -216,6 +227,7 @@ RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g effect-solutions
 RUN bun install -g opensrc
 RUN bun install -g @seanmozeik/ddg
+RUN bun install -g @seanmozeik/magic-fetch
 
 # ---- Final runtime ----
 FROM bitnami/minideb:trixie AS runtime
@@ -509,6 +521,10 @@ EOF
 RUN cp /home/yolo/.codex/RTK.md /home/yolo/.pi/agent/RTK.md \
     && printf '%s\n' '@RTK.md' > /home/yolo/.codex/AGENTS.md \
     && printf '%s\n' '@RTK.md' > /home/yolo/.pi/agent/AGENTS.md
+# Pi plugins baked into image — npm packages at the prefix the pi agent resolves,
+# and the local opencode extension at the path settings.json references as "./opencode".
+COPY --from=pi-npm-plugins /opt/pi-npm/lib/node_modules /home/yolo/.local/lib/node_modules
+COPY vendor/pi-plugins/opencode /home/yolo/.pi/agent/opencode
 RUN chown -R yolo:yolo /home/yolo
 
 RUN cat <<'EOF' >/usr/local/bin/cc-mold

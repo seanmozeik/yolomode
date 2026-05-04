@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import boxen from 'boxen';
 import { $ } from 'bun';
 import ora from 'ora';
@@ -120,11 +120,22 @@ function rewriteLocalhostUrls(value: unknown): unknown {
 async function preprocessPiAgentConfig(srcDir: string): Promise<string> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'yolomode-pi-'));
   await $`mkdir -p ${tmpDir}/agent`.quiet();
-  await $`cp -R ${srcDir}/. ${tmpDir}/agent/`.quiet().nothrow();
 
-  const sessionsDir = join(tmpDir, 'agent', 'sessions');
-  await $`rm -rf ${sessionsDir}`.quiet().nothrow();
-  await $`mkdir -p ${sessionsDir}`.quiet();
+  // Only copy auth/config files — plugins are baked into the image at build time.
+  for (const fname of [
+    'settings.json',
+    'models.json',
+    'auth.json',
+    'keybindings.json',
+    'AGENTS.md',
+    'CLAUDE.md',
+    'RTK.md'
+  ]) {
+    const src = join(srcDir, fname);
+    if (await Bun.file(src).exists()) {
+      await $`cp ${src} ${join(tmpDir, 'agent', fname)}`.quiet().nothrow();
+    }
+  }
 
   for (const fname of ['settings.json', 'models.json', 'auth.json', 'keybindings.json']) {
     const fpath = join(tmpDir, 'agent', fname);
@@ -154,47 +165,6 @@ async function preprocessPiAgentConfig(srcDir: string): Promise<string> {
     if (!agents.includes('RTK.md')) {
       await writeFile(agentsPath, `${agents.trimEnd()}\n@RTK.md\n`, { mode: 0o644 });
     }
-  }
-
-  return tmpDir;
-}
-
-function piNpmPackageName(source: unknown): string | null {
-  if (typeof source !== 'string' || !source.startsWith('npm:')) return null;
-  const spec = source.slice('npm:'.length).trim();
-  if (!spec || /[^\w@./+-]/.test(spec)) return null;
-  if (spec.startsWith('@')) {
-    const parts = spec.split('/');
-    if (parts.length < 2) return null;
-    return `${parts[0]}/${parts[1].split('@')[0]}`;
-  }
-  return spec.split('@')[0] ?? null;
-}
-
-async function stagePiNpmPackages(settingsPath: string): Promise<string> {
-  const settings = JSON.parse(await readFile(settingsPath, 'utf-8')) as { packages?: unknown };
-  const packages = Array.isArray(settings.packages)
-    ? settings.packages.map(piNpmPackageName).filter((pkg): pkg is string => Boolean(pkg))
-    : [];
-
-  const tmpDir = await mkdtemp(join(tmpdir(), 'yolomode-pi-npm-'));
-  const nodeModules = join(tmpDir, 'node_modules');
-  await $`mkdir -p ${nodeModules}`.quiet();
-  if (packages.length === 0) return tmpDir;
-
-  const npmRoot = await $`npm root -g`
-    .quiet()
-    .nothrow()
-    .text()
-    .then((s) => s.trim());
-  if (!npmRoot) return tmpDir;
-
-  for (const pkg of packages) {
-    const src = join(npmRoot, pkg);
-    if (!(await dirExists(src))) continue;
-    const dest = join(nodeModules, pkg);
-    await $`mkdir -p ${dirname(dest)}`.quiet();
-    await $`cp -R ${src} ${dest}`.quiet().nothrow();
   }
 
   return tmpDir;
@@ -384,18 +354,12 @@ export async function cmdRun(args: string[]): Promise<void> {
     mounts.push('-v', `${tmpPath}:/home/yolo/.codex/AGENTS.md:ro`);
   }
 
-  // --- Pi Agent config/auth/extensions ---
+  // --- Pi Agent config/auth --- (plugins are baked into the image)
   const piAgentDir = join(HOME, '.pi', 'agent');
   if (await dirExists(piAgentDir)) {
     const processedPiDir = await preprocessPiAgentConfig(piAgentDir);
     tmpdirs.push(processedPiDir);
     mounts.push('-v', `${processedPiDir}:/host-pi:ro`);
-    const piSettings = join(processedPiDir, 'agent', 'settings.json');
-    if (await Bun.file(piSettings).exists()) {
-      const piNpmDir = await stagePiNpmPackages(piSettings);
-      tmpdirs.push(piNpmDir);
-      mounts.push('-v', `${join(piNpmDir, 'node_modules')}:/home/yolo/.local/lib/node_modules`);
-    }
   }
 
   // --- Host git identity ---
@@ -466,6 +430,8 @@ export async function cmdRun(args: string[]): Promise<void> {
     'ANTHROPIC_API_KEY',
     '-e',
     'OPENAI_API_KEY',
+    '-e',
+    'OPENCODE_API_KEY',
     '-e',
     `PROJECT_DIR=${workDir}`,
     '-e',

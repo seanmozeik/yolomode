@@ -77,12 +77,6 @@ if [ -d /host-pi/agent ]; then
       cp "/host-pi/agent/$pi_file" "$HOME/.pi/agent/$pi_file"
     fi
   done
-  for pi_dir in prompts themes tools; do
-    if [ -d "/host-pi/agent/$pi_dir" ]; then
-      rm -rf "$HOME/.pi/agent/$pi_dir"
-      cp -a "/host-pi/agent/$pi_dir" "$HOME/.pi/agent/$pi_dir"
-    fi
-  done
 fi
 
 # Propagate host git identity into container's global config
