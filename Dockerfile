@@ -54,11 +54,6 @@ RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm bat
 
-FROM cargo-base AS tool-delta
-RUN --mount=type=secret,id=gh_token \
-    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
-    cargo-binstall --no-confirm git-delta
-
 FROM cargo-base AS tool-cargo-insta
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
@@ -93,11 +88,6 @@ FROM cargo-base AS tool-cargo-watch
 RUN --mount=type=secret,id=gh_token \
     export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
     cargo-binstall --no-confirm cargo-watch
-
-FROM cargo-base AS tool-lstr
-RUN --mount=type=secret,id=gh_token \
-    export GITHUB_TOKEN=$(cat /run/secrets/gh_token 2>/dev/null || true) && \
-    cargo-binstall --no-confirm lstr
 
 FROM cargo-base AS tool-fresh
 RUN --mount=type=secret,id=gh_token \
@@ -158,17 +148,6 @@ FROM node AS agent-browser-tools
 ENV npm_config_prefix=/opt/agent-browser
 RUN npm install -g agent-browser
 
-# ---- Pi npm plugins (pre-installed at build time; avoids copying ~1GB at container start) ----
-FROM node AS pi-npm-plugins
-ENV npm_config_prefix=/opt/pi-npm
-RUN npm install -g \
-    pi-extension-manager \
-    pi-agent-browser-native \
-    "@sherif-fanous/pi-rtk" \
-    pi-smart-fetch \
-    pi-aliases \
-    pi-caveman
-
 # ---- Language runtimes via mise (each on its own layer for caching) ----
 FROM bitnami/minideb:trixie AS mise-tools
 RUN install_packages \
@@ -216,7 +195,7 @@ RUN bun install -g @openai/codex
 
 # ---- Pi Agent (own stage so --no-cache-filter can target it) ----
 FROM bun-base AS pi-install
-RUN bun install -g @mariozechner/pi-coding-agent
+RUN bun install -g @earendil-works/pi-coding-agent
 
 # ---- Bun dev tools (cached normally) ----
 FROM bun-base AS bun-tools
@@ -225,9 +204,12 @@ RUN bun install -g portless
 RUN bun install -g @seanmozeik/markdown-display
 RUN bun install -g @seanmozeik/claudewatch
 RUN bun install -g effect-solutions
-RUN bun install -g opensrc
+RUN bun install -g opensrc skills
 RUN bun install -g @seanmozeik/ddg
 RUN bun install -g @seanmozeik/magic-fetch
+RUN bun install -g @seanmozeik/tripwire
+RUN bun install -g fkill-cli
+RUN bun install -g hunkdiff
 
 # ---- Final runtime ----
 FROM bitnami/minideb:trixie AS runtime
@@ -293,7 +275,6 @@ COPY --from=tool-just /root/.cargo/bin/just /usr/local/bin/
 COPY --from=tool-xh /root/.cargo/bin/xh /usr/local/bin/
 COPY --from=tool-nu /root/.cargo/bin/nu /usr/local/bin/
 COPY --from=tool-bat /root/.cargo/bin/bat /usr/local/bin/
-COPY --from=tool-delta /root/.cargo/bin/delta /usr/local/bin/
 COPY --from=cargo-base /root/.cargo/bin/cargo-binstall /usr/local/bin/
 COPY --from=tool-lazygit /usr/local/bin/lazygit /usr/local/bin/
 COPY --from=tool-cargo-insta /root/.cargo/bin/cargo-insta /usr/local/bin/
@@ -306,7 +287,6 @@ COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-set-version /usr/local/bin/
 COPY --from=tool-cargo-edit /root/.cargo/bin/cargo-upgrade /usr/local/bin/
 COPY --from=tool-cargo-llvm-cov /root/.cargo/bin/cargo-llvm-cov /usr/local/bin/
 COPY --from=tool-cargo-watch /root/.cargo/bin/cargo-watch /usr/local/bin/
-COPY --from=tool-lstr /root/.cargo/bin/lstr /usr/local/bin/
 COPY --from=tool-fresh /root/.cargo/bin/fresh /usr/local/bin/
 COPY --from=tool-yazi /root/.cargo/bin/yazi /usr/local/bin/
 COPY --from=tool-ast-outline /root/.cargo/bin/ast-outline /usr/local/bin/
@@ -326,7 +306,7 @@ COPY --from=pi-install /usr/local/bun /usr/local/bun
 COPY --from=mise-tools /opt/mise /opt/mise
 COPY --from=mise-tools /opt/rustup /opt/rustup
 COPY --from=mise-tools /opt/cargo /opt/cargo
-COPY xterm-ghostty.terminfo /tmp/xterm-ghostty.terminfo
+COPY config/xterm-ghostty.terminfo /tmp/xterm-ghostty.terminfo
 RUN mkdir -p /usr/share/terminfo \
     && tic -x -o /usr/share/terminfo /tmp/xterm-ghostty.terminfo \
     && rm /tmp/xterm-ghostty.terminfo
@@ -338,6 +318,9 @@ ENV CODEX_UNSAFE_ALLOW_NO_SANDBOX=1
 # Default to truecolor — overridden at runtime by -e COLORTERM if host differs
 ENV COLORTERM=truecolor
 ENV PAGER=less
+ENV EDITOR=fresh
+ENV VISUAL=fresh
+ENV SUDO_EDITOR=fresh
 
 # Shell setup (keep host TERM when supported; fall back only for unknown entries)
 RUN printf '%s\n' \
@@ -352,6 +335,9 @@ RUN printf '%s\n' \
     'alias piagent="pi"' \
     'alias cw="claudewatch"' \
     'alias lg="lazygit"' \
+    'export EDITOR=fresh' \
+    'export VISUAL=fresh' \
+    'export SUDO_EDITOR=fresh' \
     >> /home/yolo/.zshrc \
     && printf '%s\n' \
     'if [ -n "$TERM" ] && ! infocmp "$TERM" >/dev/null 2>&1; then export TERM=xterm-256color; fi' \
@@ -361,6 +347,9 @@ RUN printf '%s\n' \
     'alias piagent="pi"' \
     'alias cw="claudewatch"' \
     'alias lg="lazygit"' \
+    'export EDITOR=fresh' \
+    'export VISUAL=fresh' \
+    'export SUDO_EDITOR=fresh' \
     >> /home/yolo/.bashrc
 
 # Nu shell setup
@@ -370,8 +359,9 @@ RUN mkdir -p /home/yolo/.config/nushell \
     && starship init nu > /home/yolo/.local/share/nushell/vendor/autoload/starship.nu \
     && printf '%s\n' \
     '$env.config.show_banner = false' \
-    '$env.EDITOR = "micro"' \
-    '$env.VISUAL = "micro"' \
+    '$env.EDITOR = "fresh"' \
+    '$env.VISUAL = "fresh"' \
+    '$env.SUDO_EDITOR = "fresh"' \
     'alias cc = claude' \
     'alias co = codex' \
     'alias piagent = pi' \
@@ -402,12 +392,55 @@ def --env y [...args] {
 NUEOF
 RUN chown -R yolo:yolo /home/yolo/.config/nushell /home/yolo/.local/share/nushell
 
+# Yazi opener config. The default config remains in place; these rules are
+# prepended so source/text files prefer Fresh while other media keeps defaults.
+RUN mkdir -p /home/yolo/.config/yazi \
+    && cat <<'EOF' > /home/yolo/.config/yazi/yazi.toml
+[opener]
+edit = [
+  { run = "fresh %s", desc = "Fresh", block = true, for = "unix" },
+]
+
+[open]
+prepend_rules = [
+  { mime = "text/*", use = "edit" },
+  { mime = "application/json", use = "edit" },
+  { mime = "application/toml", use = "edit" },
+  { mime = "application/xml", use = "edit" },
+  { mime = "application/x-sh", use = "edit" },
+  { mime = "application/x-yaml", use = "edit" },
+  { url = "*.cjs", use = "edit" },
+  { url = "*.conf", use = "edit" },
+  { url = "*.css", use = "edit" },
+  { url = "*.cts", use = "edit" },
+  { url = "*.env", use = "edit" },
+  { url = "*.html", use = "edit" },
+  { url = "*.js", use = "edit" },
+  { url = "*.jsx", use = "edit" },
+  { url = "*.lock", use = "edit" },
+  { url = "*.lua", use = "edit" },
+  { url = "*.md", use = "edit" },
+  { url = "*.mjs", use = "edit" },
+  { url = "*.mts", use = "edit" },
+  { url = "*.rs", use = "edit" },
+  { url = "*.toml", use = "edit" },
+  { url = "*.ts", use = "edit" },
+  { url = "*.tsx", use = "edit" },
+  { url = "*.yaml", use = "edit" },
+  { url = "*.yml", use = "edit" },
+  { url = "Dockerfile", use = "edit" },
+  { url = "Makefile", use = "edit" },
+  { url = "justfile", use = "edit" },
+]
+EOF
+RUN chown -R yolo:yolo /home/yolo/.config/yazi
+
 # Make global bun dir writable for runtime package installs
 RUN chown -R yolo:yolo /usr/local/bun
 RUN mkdir -p /usr/local/share/npm-global && \
     chown -R yolo:yolo /usr/local/share
 # Prepare writable directories owned by yolo user
-COPY starship.toml /home/yolo/.config/starship.toml
+COPY config/starship.toml /home/yolo/.config/starship.toml
 RUN VERSION=$(ls /opt/claude/versions/) \
     && mkdir -p /home/yolo/.claude /home/yolo/.claude/skills /home/yolo/.codex \
        /home/yolo/.pi/agent /home/yolo/.pi/agent/sessions /home/yolo/.pi/agent/bin \
@@ -521,10 +554,6 @@ EOF
 RUN cp /home/yolo/.codex/RTK.md /home/yolo/.pi/agent/RTK.md \
     && printf '%s\n' '@RTK.md' > /home/yolo/.codex/AGENTS.md \
     && printf '%s\n' '@RTK.md' > /home/yolo/.pi/agent/AGENTS.md
-# Pi plugins baked into image — npm packages at the prefix the pi agent resolves,
-# and the local opencode extension at the path settings.json references as "./opencode".
-COPY --from=pi-npm-plugins /opt/pi-npm/lib/node_modules /home/yolo/.local/lib/node_modules
-COPY vendor/pi-plugins/opencode /home/yolo/.pi/agent/opencode
 RUN chown -R yolo:yolo /home/yolo
 
 RUN cat <<'EOF' >/usr/local/bin/cc-mold
@@ -554,6 +583,9 @@ export npm_config_prefix=/home/yolo/.local
 export npm_config_cache=/home/yolo/.cache/npm
 export PIP_CACHE_DIR=/home/yolo/.cache/pip
 export AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
+export EDITOR=fresh
+export VISUAL=fresh
+export SUDO_EDITOR=fresh
 
 if [ -z "${LIBCLANG_PATH:-}" ]; then
   for dir in /usr/lib/llvm-*/lib; do
@@ -660,7 +692,7 @@ RUN chmod +x /usr/local/bin/verify-codex-env.sh
 # Entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
-COPY ralph.ts /usr/local/bin/ralph
+COPY ralph.ts.txt /usr/local/bin/ralph
 RUN chmod +x /usr/local/bin/ralph
 
 USER yolo

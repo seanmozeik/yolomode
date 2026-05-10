@@ -121,7 +121,7 @@ async function preprocessPiAgentConfig(srcDir: string): Promise<string> {
   const tmpDir = await mkdtemp(join(tmpdir(), 'yolomode-pi-'));
   await $`mkdir -p ${tmpDir}/agent`.quiet();
 
-  // Only copy auth/config files — plugins are baked into the image at build time.
+  // Copy auth/config files and local plugin dirs (npm packages are installed on-demand via piUpdate).
   for (const fname of [
     'settings.json',
     'models.json',
@@ -146,6 +146,14 @@ async function preprocessPiAgentConfig(srcDir: string): Promise<string> {
       await writeFile(fpath, `${JSON.stringify(fixed, null, 2)}\n`, { mode: 0o600 });
     } catch {
       /* file may not exist or may not be JSON */
+    }
+  }
+
+  // Copy local plugin dirs (small TS-only, no node_modules)
+  for (const pluginDir of ['opencode']) {
+    const src = join(srcDir, pluginDir);
+    if (await dirExists(src)) {
+      await $`cp -R ${src} ${join(tmpDir, 'agent', pluginDir)}`.quiet().nothrow();
     }
   }
 
@@ -352,6 +360,16 @@ export async function cmdRun(args: string[]): Promise<void> {
     const tmpPath = join(tmp, 'AGENTS.md');
     await writeFile(tmpPath, processed, { mode: 0o644 });
     mounts.push('-v', `${tmpPath}:/home/yolo/.codex/AGENTS.md:ro`);
+  }
+
+  // --- Tripwire config ---
+  const tripwireConfig = join(
+    process.env.XDG_CONFIG_HOME || join(HOME, '.config'),
+    'tripwire',
+    'config.json'
+  );
+  if (await Bun.file(tripwireConfig).exists()) {
+    mounts.push('-v', `${tripwireConfig}:/host-tripwire/config.json:ro`);
   }
 
   // --- Pi Agent config/auth --- (plugins are baked into the image)

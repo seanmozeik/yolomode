@@ -11,6 +11,9 @@ export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-/home/yolo/.cache/cargo-target/defa
 export RUSTC_WRAPPER=/usr/local/bin/sccache
 export SCCACHE_DIR=/home/yolo/.cache/sccache
 export SCCACHE_CACHE_SIZE=10G
+export EDITOR=fresh
+export VISUAL=fresh
+export SUDO_EDITOR=fresh
 
 if [ -z "$LIBCLANG_PATH" ]; then
   for dir in /usr/lib/llvm-*/lib; do
@@ -68,6 +71,12 @@ if [ -f /host-codex/config.toml ]; then
   cp /host-codex/config.toml "$HOME/.codex/config.toml"
 fi
 
+# Copy Tripwire config from host mount
+if [ -f /host-tripwire/config.json ]; then
+  mkdir -p "$HOME/.config/tripwire"
+  cp /host-tripwire/config.json "$HOME/.config/tripwire/config.json"
+fi
+
 # Copy Pi Agent config from host mount. These are preprocessed by the CLI so
 # host-local model URLs work from inside Docker.
 if [ -d /host-pi/agent ]; then
@@ -75,6 +84,13 @@ if [ -d /host-pi/agent ]; then
   for pi_file in settings.json models.json auth.json keybindings.json AGENTS.md CLAUDE.md RTK.md; do
     if [ -f "/host-pi/agent/$pi_file" ]; then
       cp "/host-pi/agent/$pi_file" "$HOME/.pi/agent/$pi_file"
+    fi
+  done
+  # Local plugin dirs (TS-only, no node_modules — fast to copy)
+  for pi_dir in opencode; do
+    if [ -d "/host-pi/agent/$pi_dir" ]; then
+      rm -rf "$HOME/.pi/agent/$pi_dir"
+      cp -a "/host-pi/agent/$pi_dir" "$HOME/.pi/agent/$pi_dir"
     fi
   done
 fi

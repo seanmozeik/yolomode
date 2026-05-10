@@ -129,11 +129,12 @@ try {
         await writeFile(join(ctx, 'entrypoint.sh'), ENTRYPOINT, {
           mode: 0o755
         });
-        await writeFile(join(ctx, 'xterm-ghostty.terminfo'), GHOSTTY_TERMINFO);
-        await writeFile(join(ctx, 'ralph.ts'), RALPH, {
+        await $`mkdir -p ${join(ctx, 'config')}`.quiet();
+        await writeFile(join(ctx, 'config', 'xterm-ghostty.terminfo'), GHOSTTY_TERMINFO);
+        await writeFile(join(ctx, 'ralph.ts.txt'), RALPH, {
           mode: 0o755
         });
-        await writeFile(join(ctx, 'starship.toml'), STARSHIP);
+        await writeFile(join(ctx, 'config', 'starship.toml'), STARSHIP);
         const buildArgs = ['build', '-t', IMAGE];
         if (hasFlag(args, '--no-cache')) buildArgs.push('--no-cache');
         else buildArgs.push('--no-cache-filter=claude-install,codex-install,pi-install,tool-rtk');
