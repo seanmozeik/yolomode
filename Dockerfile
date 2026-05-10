@@ -244,7 +244,8 @@ RUN install_packages \
     coreutils findutils grep \
     zsh-autosuggestions zsh-syntax-highlighting \
     chromium \
-    fonts-liberation fonts-noto-color-emoji
+    fonts-liberation fonts-noto-color-emoji \
+    file
 
 # Pre-installed tool paths (read-only from build stages)
 ENV BUN_INSTALL=/usr/local/bun
@@ -486,74 +487,6 @@ debug = 1
 nt = "nextest run"
 nw = "nextest run --workspace"
 EOF
-RUN cat <<'EOF' > /home/yolo/.codex/RTK.md
-# RTK - Rust Token Killer (Codex CLI)
-
-**Usage**: Token-optimized CLI proxy for shell commands.
-
-## Rule
-
-Always prefix shell commands with `rtk`.
-
-Examples:
-
-```bash
-rtk git status
-rtk cargo test
-rtk npm run build
-rtk pytest -q
-```
-
-## Meta Commands
-
-```bash
-rtk gain            # Token savings analytics
-rtk gain --history  # Recent command savings history
-rtk proxy <cmd>     # Run raw command without filtering
-```
-
-## Verification
-
-```bash
-rtk --version
-rtk gain
-which rtk
-```
-EOF
-RUN cat <<'EOF' > /home/yolo/.claude/RTK.md
-# RTK - Rust Token Killer
-
-**Usage**: Token-optimized CLI proxy (60-90% savings on dev operations)
-
-## Meta Commands (always use rtk directly)
-
-```bash
-rtk gain              # Show token savings analytics
-rtk gain --history    # Show command usage history with savings
-rtk discover          # Analyze Claude Code history for missed opportunities
-rtk proxy <cmd>       # Execute raw command without filtering (for debugging)
-```
-
-## Installation Verification
-
-```bash
-rtk --version         # Should show: rtk X.Y.Z
-rtk gain              # Should work (not "command not found")
-which rtk             # Verify correct binary
-```
-
-⚠️ **Name collision**: If `rtk gain` fails, you may have reachingforthejack/rtk (Rust Type Kit) installed instead.
-
-## Hook-Based Usage
-
-All other commands are automatically rewritten by the Claude Code hook.
-Example: `git status` → `rtk git status` (transparent, 0 tokens overhead)
-
-Refer to CLAUDE.md for full command reference.
-EOF
-RUN cp /home/yolo/.codex/RTK.md /home/yolo/.pi/agent/RTK.md \
-    && printf '%s\n' '@RTK.md' > /home/yolo/.codex/AGENTS.md \
-    && printf '%s\n' '@RTK.md' > /home/yolo/.pi/agent/AGENTS.md
 RUN chown -R yolo:yolo /home/yolo
 
 RUN cat <<'EOF' >/usr/local/bin/cc-mold
@@ -642,7 +575,7 @@ for var in HOME PATH MISE_DATA_DIR MISE_CONFIG_DIR CARGO_HOME CARGO_TARGET_DIR R
   fi
 done
 
-for bin in mise node uv codex claude pi rtk ddg cargo-binstall sccache cargo-nextest bacon cargo-watch cargo-add cargo-upgrade cargo-llvm-cov mold lld clang cmake ninja protoc; do
+for bin in mise node uv codex claude pi ddg cargo-binstall sccache cargo-nextest bacon cargo-watch cargo-add cargo-upgrade cargo-llvm-cov mold lld clang cmake ninja protoc; do
   if ! command -v "$bin" >/dev/null 2>&1; then
     echo "ERROR: required command not found on PATH: $bin" >&2
     fail=1
